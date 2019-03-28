@@ -4,10 +4,6 @@ from numpy.random import randint
 
 class S:   
     def __init__(self, p):
-        
-        self.mean_max_corrs = {} # dict containing max_corrs, W_norms, mean_class_act
-        # {mean_max_corrs: {it: {'fc.0.weight': val}}}
-        
         # accs / losses
         self.losses_train = np.zeros(p.num_iters) # training loss curve (should be plotted against p.its)
         self.losses_test = np.zeros(p.num_iters)  # testing loss curve (should be plotted against p.its)
