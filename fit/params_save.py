@@ -13,7 +13,8 @@ class S:
         self.losses_test = np.zeros(p.num_iters)  # testing loss curve (should be plotted against p.its)
         self.accs_train = np.zeros(p.num_iters)   # training acc curve (should be plotted against p.its)               
         self.accs_test = np.zeros(p.num_iters)    # testing acc curve (should be plotted against p.its)
-        self.weights = None
+        self.model_weights = None
+        self.comp_model_weights = None
         self.explanation_divergence = np.zeros(p.num_iters)
     
     # dictionary of everything but weights

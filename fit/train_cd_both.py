@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 import numpy as np
 from torchtext import data
 from torchtext import datasets
-
+from copy import deepcopy
 from model import LSTMSentiment
 sys.path.append('../../acd/scores')
 import cd
@@ -17,7 +17,6 @@ import cd
 
 def get_args():
     parser = ArgumentParser(description='PyTorch/torchtext SST')
-    parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--d_embed', type=int, default=300)
     parser.add_argument('--d_proj', type=int, default=300)
@@ -37,10 +36,7 @@ def get_args():
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
     parser.add_argument('--resume_snapshot', type=str, default='model1.pt')
-    
     parser.add_argument('--comparison_model', type=str, default='model2.pt')
-    parser.add_argument('--bad', dest='bad', action='store_true')
-    parser.set_defaults(bad=False)
     args = parser.parse_args()
     return args
 
@@ -52,9 +48,7 @@ def save(p, s):
         os.makedirs(p.out_dir)
     params_dict = p._dict(p)
     results_combined = {**params_dict, **s._dict()}    
-    pkl.dump(results_combined, open(oj(p.out_dir, out_name + '.pkl'), 'wb'))
-
-args = get_args()
+    pkl.dump(results_combined, open(os.path.join(p.out_dir, out_name + '.pkl'), 'wb'))
 
 
 def seed(p):
@@ -64,6 +58,7 @@ def seed(p):
     random.seed(p.seed)
 
 
+args = get_args()
 from params_fit import p # get parameters
 from params_save import S # class to save objects
 seed(p)
@@ -100,8 +95,6 @@ config.n_embed = len(inputs.vocab)
 config.d_out = len(answers.vocab)
 config.n_cells = config.n_layers
 
-if args.bad:
-    config.d_hidden = 10
 
 # double the number of cells for bidirectional networks
 if config.birnn:
@@ -130,9 +123,9 @@ dev_log_template = ' '.join(
 log_template = ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{},{:12.4f},{}'.split(','))
 folder_name =str("trial"+str(np.random.randint(1000 )))
 args.save_path = os.path.join(args.save_path, folder_name)
-makedirs(args.save_path)
+os.makedirs(args.save_path, exist_ok=True)
 print(args.save_path)
-makedirs(args.save_path)
+os.makedirs(args.save_path, exist_ok=True)
 print(header)
 
 all_break = False
@@ -140,7 +133,7 @@ for epoch in range(p.num_iters):
     if all_break:
         break
     train_iter.init_epoch()
-    n_correct, n_total = 0, 0
+    n_correct, n_total, cd_loss_tot = 0, 0, 0
     for batch_idx, batch in enumerate(train_iter):
 
         # switch model to training mode, clear gradient accumulators
@@ -166,89 +159,84 @@ for epoch in range(p.num_iters):
         loss2= criterion(answer2, batch.label)
         
         # calculate loss of the network output with respect to training labels
-  
-
-            
         start = np.random.randint(batch_length-1)
         stop = start + np.random.randint(batch_length-start)
         cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop, return_mean = False, return_symm_ = True)).mean()
         total_loss = loss +loss2 + cd_loss
         total_loss.backward()
-
-
-
-
-
+        cd_loss_tot += cd_loss.item()
         opt.step()
 
-        # checkpoint model periodically
-        if iterations % args.save_every == 0:
-            snapshot_prefix = os.path.join(args.save_path, 'snapshot')
-            if args.bad:
-                snapshot_prefix += '_bad'
-           
-            snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc.item(), loss.data.item(),
-                                                                                                iterations)
-            torch.save(model, snapshot_path)
-            for f in glob.glob(snapshot_prefix + '*'):
-                if f != snapshot_path:
-                    os.remove(f)
+    # checkpoint model periodically
+    '''
+    if iterations % args.save_every == 0:
+        snapshot_prefix = os.path.join(args.save_path, 'snapshot')
 
-        # evaluate performance on validation set periodically
-        # if iterations % args.dev_every == 0 or (args.bad and iterations % (args.dev_every / 10) == 0):
-        if iterations % args.dev_every == 0:
+        snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc.item(), loss.data.item(),
+                                                                                            iterations)
+        torch.save(model, snapshot_path)
+        for f in glob.glob(snapshot_prefix + '*'):
+            if f != snapshot_path:
+                os.remove(f)
+    '''
 
-            # switch model to evaluation mode
-            model.eval();
-            dev_iter.init_epoch()
+    # evaluate performance on validation set periodically
 
-            # calculate accuracy on validation set
-            n_dev_correct, dev_loss = 0, 0
-            for dev_batch_idx, dev_batch in enumerate(dev_iter):
-                answer = model(dev_batch)
-                n_dev_correct += (
-                    torch.max(answer, 1)[1].view(dev_batch.label.size()).data == dev_batch.label.data).sum()
-                dev_loss = criterion(answer, dev_batch.label)
-            dev_acc = 100. * n_dev_correct / len(dev)
+    # switch model to evaluation mode
+    model.eval();
+    dev_iter.init_epoch()
 
-            print(dev_log_template.format(time.time() - start_time,
-                                          epoch, iterations, 1 + batch_idx, len(train_iter),
-                                          100. * (1 + batch_idx) / len(train_iter), loss.data.item(), dev_loss.data.item(),
-                                          train_acc, dev_acc))
+    # calculate accuracy on validation set
+    n_dev_correct, dev_loss = 0, 0
+    for dev_batch_idx, dev_batch in enumerate(dev_iter):
+        answer = model(dev_batch)
+        n_dev_correct += (
+            torch.max(answer, 1)[1].view(dev_batch.label.size()).data == dev_batch.label.data).sum()
+        dev_loss = criterion(answer, dev_batch.label)
+    dev_acc = 100. * n_dev_correct / len(dev)
 
-            # update best valiation set accuracy
-            if dev_acc > best_dev_acc:
+    print(dev_log_template.format(time.time() - start_time,
+                                  epoch, iterations, 1 + batch_idx, len(train_iter),
+                                  100. * (1 + batch_idx) / len(train_iter), loss.data.item(), dev_loss.data.item(),
+                                  train_acc, dev_acc))
 
-                best_dev_acc = dev_acc
-                snapshot_prefix = os.path.join(args.save_path, 'best_snapshot')
-                if args.bad:
-                    snapshot_prefix += '_bad'
-                snapshot_path = snapshot_prefix + 'trainboth_devacc_{}_devloss_{}__iter_{}_model1.pt'.format(dev_acc,
-                                                                                                   dev_loss.data.item(),
-                                                                                                   iterations)
+    # update best valiation set accuracy
+    '''
+    if dev_acc > best_dev_acc:
 
-                # save model, delete previous 'best_snapshot' files
-                torch.save(model, snapshot_path)
-                snapshot_path = snapshot_prefix + 'trainboth_devacc_{}_devloss_{}__iter_{}_model2.pt'.format(dev_acc,
-                                                                                                   dev_loss.data.item(),
-                                                                                                   iterations)
+        best_dev_acc = dev_acc
+        snapshot_prefix = os.path.join(args.save_path, 'best_snapshot')
+        snapshot_path = snapshot_prefix + 'trainboth_devacc_{}_devloss_{}__iter_{}_model1.pt'.format(dev_acc,
+                                                                                           dev_loss.data.item(),
+                                                                                           iterations)
 
-                # save model, delete previous 'best_snapshot' files
-                torch.save(comp_model, snapshot_path)
-                print("Saved", snapshot_path, iterations)
-                for f in glob.glob(snapshot_prefix + '*'):
-                    if f != snapshot_path and ((args.bad and 'bad' not in f) or (not args.bad and 'bad' in f)):
-                        os.remove(f)
+        # save model, delete previous 'best_snapshot' files
+        torch.save(model, snapshot_path)
+        snapshot_path = snapshot_prefix + 'trainboth_devacc_{}_devloss_{}__iter_{}_model2.pt'.format(dev_acc,
+                                                                                           dev_loss.data.item(),
+                                                                                           iterations)
 
-                # If we want a bad model, quit early
-                if False and args.bad and best_dev_acc > 0.65:
-                    all_break = True
-                    break
+        # save model, delete previous 'best_snapshot' files
+        torch.save(comp_model, snapshot_path)
+        print("Saved", snapshot_path, iterations)
+        for f in glob.glob(snapshot_prefix + '*'):
+            if f != snapshot_path:
+                os.remove(f)
+    '''
 
-        elif iterations % args.log_every == 0:
 
-            # print progress message
-            print(log_template.format(time.time() - start_time,
-                                      epoch, iterations, 1 + batch_idx, len(train_iter),
-                                      100. * (1 + batch_idx) / len(train_iter), loss.data, ' ' * 8,
-                                      n_correct / n_total * 100, ' ' * 12))
+    # print progress message
+    print(log_template.format(time.time() - start_time,
+                                  epoch, iterations, 1 + batch_idx, len(train_iter),
+                                  100. * (1 + batch_idx) / len(train_iter), loss.data, ' ' * 8,
+                                  n_correct / n_total * 100, ' ' * 12))
+    
+    # save things
+    s.accs_train[epoch] = train_acc.item()
+    s.accs_test[epoch] = dev_acc
+    s.losses_train[epoch] = loss.data.item()
+    s.loss_test[epoch] = dev_loss.data.item()
+    s.explanation_divergence[epoch] = cd_loss_tot
+    s.model_weights = deepcopy(model.state_dict()
+    s.comp_model_weights = deepcopy(comp_model.state_dict()
+    save(s, p)
