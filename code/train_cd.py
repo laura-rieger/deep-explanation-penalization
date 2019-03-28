@@ -1,22 +1,24 @@
 import os
 import time
 import glob
-
+import sys
 import torch
 import torch.optim as O
 import torch.nn as nn
 from argparse import ArgumentParser
-
+import numpy as np
 from torchtext import data
 from torchtext import datasets
 
 from model import LSTMSentiment
+sys.path.append('../../acd/scores')
+import cd
 
 
 def get_args():
     parser = ArgumentParser(description='PyTorch/torchtext SST')
     parser.add_argument('--epochs', type=int, default=5)
-    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--d_embed', type=int, default=300)
     parser.add_argument('--d_proj', type=int, default=300)
     parser.add_argument('--d_hidden', type=int, default=128)
@@ -34,9 +36,11 @@ def get_args():
     parser.add_argument('--save_path', type=str, default='results')
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
-    parser.add_argument('--resume_snapshot', type=str, default='')
-    parser.add_argument('--bad', dest='bad', action='store_true')
+    parser.add_argument('--resume_snapshot', type=str, default='model1.pt')
     
+    parser.add_argument('--sparse_signal', dest='use_sparse_signal', action='store_true')
+    parser.add_argument('--comparison_model', type=str, default='model2.pt')
+    parser.add_argument('--bad', dest='bad', action='store_true')
     parser.set_defaults(bad=False)
     args = parser.parse_args()
     return args
@@ -61,6 +65,8 @@ def makedirs(name):
 
 args = get_args()
 torch.cuda.set_device(args.gpu)
+
+use_sparse_signal = args.use_sparse_signal
 inputs = data.Field(lower=args.lower)
 answers = data.Field(sequential=False, unk_token=None)
 
@@ -81,6 +87,11 @@ train_iter, dev_iter, test_iter = data.BucketIterator.splits(
     (train, dev, test), batch_size=args.batch_size, device=torch.device(args.gpu))
 
 config = args
+if config.comparison_model and os.path.isfile(config.comparison_model):
+    comp_model = torch.load(args.comparison_model, map_location=lambda storage, location: storage.cuda(args.gpu))
+else:
+    print("No valid model for comparison provided")
+    sys.exit()
 config.n_embed = len(inputs.vocab)
 config.d_out = len(answers.vocab)
 config.n_cells = config.n_layers
@@ -91,6 +102,7 @@ if args.bad:
 # double the number of cells for bidirectional networks
 if config.birnn:
     config.n_cells *= 2
+
 
 if args.resume_snapshot:
     model = torch.load(args.resume_snapshot, map_location=lambda storage, location: storage.cuda(args.gpu))
@@ -105,14 +117,17 @@ opt = O.Adam(model.parameters())  # , lr=args.lr)
 # model.embed.requires_grad = False
 
 iterations = 0
-start = time.time()
+start_time = time.time()
 best_dev_acc = -1
 train_iter.repeat = False
 header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss     Accuracy  Dev/Accuracy'
 dev_log_template = ' '.join(
     '{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{:8.6f},{:12.4f},{:12.4f}'.split(','))
 log_template = ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{},{:12.4f},{}'.split(','))
+folder_name =str("trial"+str(np.random.randint(1000 )))
+args.save_path = os.path.join(args.save_path, folder_name)
 makedirs(args.save_path)
+print(args.save_path)
 print(header)
 
 all_break = False
@@ -136,10 +151,27 @@ for epoch in range(args.epochs):
         n_correct += (torch.max(answer, 1)[1].view(batch.label.size()).data == batch.label.data).sum()
         n_total += batch.batch_size
         train_acc = 100. * n_correct / n_total
+        
+        #calculate explanation loss
+        batch_length = batch.text.shape[0]
 
+        
         # calculate loss of the network output with respect to training labels
-        loss = criterion(answer, batch.label)
+        start = np.random.randint(batch_length-1)
+        stop = start + np.random.randint(batch_length-start)
 
+        if use_sparse_signal:
+        
+            answer2 = comp_model(batch)
+            mask = ((torch.max(answer, 1)[1] != batch.label.data)*
+            (torch.max(answer2, 1)[1] == batch.label.data))
+            cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop, return_mean = False, return_symm_ = True)).masked_select(mask).mean()
+        else:
+            cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop, return_mean = False, return_symm_ = True)).mean()
+   
+        
+        loss = criterion(answer, batch.label) + cd_loss
+        #loss = criterion(answer, batch.label)
         # backpropagate and update optimizer learning rate
         loss.backward();
         opt.step()
@@ -149,8 +181,11 @@ for epoch in range(args.epochs):
             snapshot_prefix = os.path.join(args.save_path, 'snapshot')
             if args.bad:
                 snapshot_prefix += '_bad'
-           
-            snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc.item(), loss.data.item(),
+            if use_sparse_signal:
+                snapshot_path = snapshot_prefix + 'sparse_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc.item(), loss.data.item(),
+                                                                                                iterations)
+            else:
+                snapshot_path = snapshot_prefix + 'full_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc.item(), loss.data.item(),
                                                                                                 iterations)
             torch.save(model, snapshot_path)
             for f in glob.glob(snapshot_prefix + '*'):
@@ -174,7 +209,7 @@ for epoch in range(args.epochs):
                 dev_loss = criterion(answer, dev_batch.label)
             dev_acc = 100. * n_dev_correct / len(dev)
 
-            print(dev_log_template.format(time.time() - start,
+            print(dev_log_template.format(time.time() - start_time,
                                           epoch, iterations, 1 + batch_idx, len(train_iter),
                                           100. * (1 + batch_idx) / len(train_iter), loss.data.item(), dev_loss.data.item(),
                                           train_acc, dev_acc))
@@ -184,9 +219,10 @@ for epoch in range(args.epochs):
 
                 best_dev_acc = dev_acc
                 snapshot_prefix = os.path.join(args.save_path, 'best_snapshot')
+                
                 if args.bad:
                     snapshot_prefix += '_bad'
-                snapshot_path = snapshot_prefix + '_devacc_{}_devloss_{}__iter_{}_model.pt'.format(dev_acc,
+                snapshot_path = snapshot_prefix + 'sparse_devacc_{}_devloss_{}__iter_{}_model.pt'.format(dev_acc,
                                                                                                    dev_loss.data.item(),
                                                                                                    iterations)
 
@@ -205,7 +241,7 @@ for epoch in range(args.epochs):
         elif iterations % args.log_every == 0:
 
             # print progress message
-            print(log_template.format(time.time() - start,
+            print(log_template.format(time.time() - start_time,
                                       epoch, iterations, 1 + batch_idx, len(train_iter),
                                       100. * (1 + batch_idx) / len(train_iter), loss.data, ' ' * 8,
                                       n_correct / n_total * 100, ' ' * 12))
