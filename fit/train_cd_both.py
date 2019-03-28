@@ -45,24 +45,30 @@ def get_args():
     return args
 
 
-def makedirs(name):
-    """helper function for python 2 and 3 to call os.makedirs()
-       avoiding an error if the directory to be created already exists"""
 
-    import os, errno
-
-    try:
-        os.makedirs(name)
-    except OSError as ex:
-        if ex.errno == errno.EEXIST and os.path.isdir(name):
-            # ignore existing directory
-            pass
-        else:
-            # a different error happened
-            raise
-
+def save(p, s):
+    # save final
+    if not os.path.exists(p.out_dir):  
+        os.makedirs(p.out_dir)
+    params_dict = p._dict(p)
+    results_combined = {**params_dict, **s._dict()}    
+    pkl.dump(results_combined, open(oj(p.out_dir, out_name + '.pkl'), 'wb'))
 
 args = get_args()
+
+
+def seed(p):
+    # set random seed        
+    np.random.seed(p.seed) 
+    torch.manual_seed(p.seed)    
+    random.seed(p.seed)
+
+
+from params_fit import p # get parameters
+from params_save import S # class to save objects
+seed(p)
+s = S(p)
+
 torch.cuda.set_device(args.gpu)
 
 inputs = data.Field(lower=args.lower)
@@ -77,7 +83,7 @@ if args.word_vectors:
         inputs.vocab.vectors = torch.load(args.vector_cache)
     else:
         inputs.vocab.load_vectors(args.word_vectors)
-        makedirs(os.path.dirname(args.vector_cache))
+        os.makedirs(os.path.dirname(args.vector_cache), exist_ok=True)
         torch.save(inputs.vocab.vectors, args.vector_cache)
 answers.build_vocab(train)
 
@@ -130,7 +136,7 @@ makedirs(args.save_path)
 print(header)
 
 all_break = False
-for epoch in range(args.epochs):
+for epoch in range(p.num_iters):
     if all_break:
         break
     train_iter.init_epoch()
