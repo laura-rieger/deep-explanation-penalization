@@ -1,4 +1,0 @@
-trial 148 training one model with non sparse signal  (all) *10 backwards kl
-trial 256 non sparse, 1*expl
-trial 874 with both, sparse
-trial 869 with both non sparse

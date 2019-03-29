@@ -5,10 +5,10 @@ class p:
     train_both = True # whether to train just one model or both
     sparse_signal = True # train on incorrect data points or not
     signal_strength = 1.0 # how much to weight kl-divergence
-    starting_folder = '.' # folder that store initial models
-    num_iters = 10 # how many iterations to train for
+    starting_folder = '../models/init_models/' # folder that store initial models
+    num_iters = 1 # how many epochs to train for
     seed = 0 # random seed
-    out_dir = './out' # directory to save to
+    out_dir = '../models/trained_models/' # directory to save to
     
 
     # exporting ########

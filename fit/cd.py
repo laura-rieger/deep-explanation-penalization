@@ -299,22 +299,14 @@ def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
 def softmax_out(output):
     return torch.nn.functional.softmax(torch.stack((output[0].reshape(-1),output[1].reshape(-1)), 1), dim = 1)
 
-def cd_penalty(batch, model1, model2, start, stop, return_mean = True, return_symm_ = True):
+def cd_penalty(batch, model1, model2, start, stop):
    
     model1_output = cd_batch_text(batch, model1, start, stop)
     model2_output = cd_batch_text(batch, model2, start, stop)
     model1_softmax = softmax_out(model1_output)
     model2_softmax = softmax_out(model2_output)
-    if return_mean:
-        if not return_symm_:
-            return ((model2_softmax)*(torch.log(model2_softmax) - torch.log(model1_softmax))).mean()
-        else:
-        
-            return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).mean()
-        
 
-    else:
-        return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).sum(dim=1).reshape((2,-1)).sum(dim=0)
+    return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).sum(dim=1).reshape((2,-1)).sum(dim=0)
         
     
 # this implementation of cd is very long so that we can view CD at intermediate layers
