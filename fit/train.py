@@ -17,26 +17,17 @@ import random
 import pickle as pkl 
 def get_args():
     parser = ArgumentParser(description='PyTorch/torchtext SST')
-    parser.add_argument('--batch_size', type=int, default=100)
-    parser.add_argument('--d_embed', type=int, default=300)
-    parser.add_argument('--d_proj', type=int, default=300)
-    parser.add_argument('--d_hidden', type=int, default=128)
-    parser.add_argument('--n_layers', type=int, default=1)
-    parser.add_argument('--log_every', type=int, default=1000)
-    parser.add_argument('--lr', type=float, default=.001)
-    parser.add_argument('--dev_every', type=int, default=1000)
-    parser.add_argument('--save_every', type=int, default=1000)
-    parser.add_argument('--dp_ratio', type=int, default=0.2)
-    parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
-    parser.add_argument('--preserve-case', action='store_false', dest='lower')
-    parser.add_argument('--no-projection', action='store_false', dest='projection')
-    parser.add_argument('--train_embed', action='store_false', dest='fix_emb')
+    parser.add_argument('--batch_size', type=int, default=50)
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--save_path', type=str, default='results')
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '../data/.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
-    parser.add_argument('--resume_snapshot', type=str, default='../models/init_models/model1.pt')
+    parser.add_argument('--model', type=str, default='../models/init_models/model1.pt')
     parser.add_argument('--comparison_model', type=str, default='../models/init_models/model2.pt')
+    parser.add_argument('--train_both', type=int, default=1)
+    parser.add_argument('--signal_strength', type=float, default=1.0)
+    parser.add_argument('--sparse_signal', type=int, default=1)
+    parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
+    parser.add_argument('--n_layers', type=int, default=1)
     args = parser.parse_args()
     return args
 
@@ -61,13 +52,18 @@ def seed(p):
 args = get_args()
 from params_fit import p # get parameters
 from params_save import S # class to save objects
+p.train_both = bool(args.train_both)
+p.sparse_signal = bool(args.sparse_signal)
+p.signal_strength = args.signal_strength
+
+
 seed(p)
 s = S(p)
 out_name = p._str(p)
 
 torch.cuda.set_device(args.gpu)
 
-inputs = data.Field(lower=args.lower)
+inputs = data.Field(lower=True)
 answers = data.Field(sequential=False, unk_token=None)
 
 train, dev, test = datasets.SST.splits(inputs, answers, fine_grained=False, train_subtrees=True,
@@ -102,8 +98,8 @@ if config.birnn:
     config.n_cells *= 2
 
 
-if args.resume_snapshot:
-    model = torch.load(args.resume_snapshot, map_location=lambda storage, location: storage.cuda(args.gpu))
+if args.model:
+    model = torch.load(args.model, map_location=lambda storage, location: storage.cuda(args.gpu))
 else:
     model = LSTMSentiment(config)
     if args.word_vectors:
@@ -174,17 +170,7 @@ for epoch in range(p.num_iters):
         opt.step()
 
     # checkpoint model periodically
-    '''
-    if iterations % args.save_every == 0:
-        snapshot_prefix = os.path.join(args.save_path, 'snapshot')
 
-        snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc.item(), loss.data.item(),
-                                                                                            iterations)
-        torch.save(model, snapshot_path)
-        for f in glob.glob(snapshot_prefix + '*'):
-            if f != snapshot_path:
-                os.remove(f)
-    '''
 
     # evaluate performance on validation set periodically
 
@@ -201,10 +187,7 @@ for epoch in range(p.num_iters):
         dev_loss = criterion(answer, dev_batch.label)
     dev_acc = 100. * n_dev_correct / len(dev)
 
-    print(dev_log_template.format(time.time() - start_time,
-                                  epoch, iterations, 1 + batch_idx, len(train_iter),
-                                  100. * (1 + batch_idx) / len(train_iter), loss.data.item(), dev_loss.data.item(),
-                                  train_acc, dev_acc))
+
 
     # update best valiation set accuracy
     '''
@@ -230,17 +213,20 @@ for epoch in range(p.num_iters):
                 os.remove(f)
     '''
 
-
-    # print progress message
-    print(log_template.format(time.time() - start_time,
+    print(dev_log_template.format(time.time() - start_time,
                                   epoch, iterations, 1 + batch_idx, len(train_iter),
-                                  100. * (1 + batch_idx) / len(train_iter), loss.data, ' ' * 8,
-                                  n_correct / n_total * 100, ' ' * 12))
+                                  100. * (1 + batch_idx) / len(train_iter), total_loss.data.item(), dev_loss.data.item(), 
+                                  train_acc, dev_acc))
+    # print progress message
+    # print(log_template.format(time.time() - start_time,
+                                  # epoch, iterations, 1 + batch_idx, len(train_iter),
+                                  # 100. * (1 + batch_idx) / len(train_iter), total_loss.data, ' ' * 8,
+                                  # n_correct / n_total * 100, ' ' * 12))
     
     # save things
     s.accs_train[epoch] = train_acc.item()
     s.accs_test[epoch] = dev_acc
-    s.losses_train[epoch] = loss.data.item()
+    s.losses_train[epoch] = total_loss.data.item()
     s.losses_test[epoch] = dev_loss.data.item()
     s.explanation_divergence[epoch] = cd_loss_tot
     s.model_weights = deepcopy(model.state_dict())
