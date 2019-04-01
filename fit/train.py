@@ -35,7 +35,6 @@ def get_args():
 
 def save(p, s, out_name):
     # save final
-
     os.makedirs(p.out_dir, exist_ok=True)
     params_dict = p._dict(p)
     results_combined = {**params_dict, **s._dict()}    

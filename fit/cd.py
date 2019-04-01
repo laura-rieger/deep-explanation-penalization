@@ -136,7 +136,6 @@ def cd(blob, im_torch, model, model_type='mnist', device='cuda'):
 
 
 # batch of [start, stop) with unigrams working
-
 def cd_batch_text(batch, model, start, stop, my_device = 0):
 # rework for 
     weights = model.lstm
@@ -210,7 +209,7 @@ def cd_batch_text(batch, model, start, stop, my_device = 0):
 
     #tolerance = 0.001
     #assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
-    return scores,irrel_scores
+    return scores, irrel_scores
 
 
 

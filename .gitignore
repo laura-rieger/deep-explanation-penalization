@@ -105,3 +105,6 @@ venv.bak/
 
 data/
 models/trained_models
+acd
+**_cache
+**.pkl
