@@ -52,8 +52,8 @@ def seed(p):
 args = get_args()
 from params_fit import p # get parameters
 from params_save import S # class to save objects
-p.train_both = bool(args.train_both)
 p.sparse_signal = bool(args.sparse_signal)
+p.train_both = bool(args.train_both)
 p.signal_strength = args.signal_strength
 
 
@@ -114,10 +114,10 @@ iterations = 0
 start_time = time.time()
 best_dev_acc = -1
 train_iter.repeat = False
-header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss     Accuracy  Dev/Accuracy'
+header = '  Time Epoch Iteration Progress    (%Epoch)   Loss   Dev/Loss  CD Loss    Accuracy  Dev/Accuracy'
 dev_log_template = ' '.join(
-    '{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{:8.6f},{:12.4f},{:12.4f}'.split(','))
-log_template = ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{},{:12.4f},{}'.split(','))
+    '{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{:8.6f},{:8.6f},{:12.4f},{:12.4f}'.split(','))
+#log_template = ' '.join('{:>6.0f},{:>5.0f},{:>9.0f},{:>5.0f}/{:<5.0f} {:>7.0f}%,{:>8.6f},{},{:12.4f},{}'.split(','))
 
 
 print(header)
@@ -153,18 +153,26 @@ for epoch in range(p.num_iters):
 
         loss_net1 = criterion(answer1, batch.label)
         loss_net2= criterion(answer2, batch.label)
-        
+        total_loss = loss_net1
+        if p.train_both:
+            total_loss= total_loss+loss_net2
         # calculate loss of the network output with respect to training labels
         start = np.random.randint(batch_length-1)
         stop = start + np.random.randint(batch_length-start)
+        
         if p.sparse_signal:
-            mask = ((torch.max(answer1, 1)[1] != batch.label.data)*(torch.max(answer2, 1)[1] == batch.label.data))
-            cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop)).masked_select(mask).mean()
+            #mask = ((torch.max(answer1, 1)[1] != batch.label.data)*(torch.max(answer2, 1)[1] == batch.label.data)) # only use where one is correct
+            mask = (torch.max(answer1, 1)[1] != (torch.max(answer2, 1)[1])) # use where disagreement
+            if mask.any():
+            
+                cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop)).masked_select(mask).mean()    
+                total_loss = total_loss+ p.signal_strength*cd_loss
+        
         else:
             cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop)).mean()
-        total_loss = loss_net1  + p.signal_strength*cd_loss
-        if p.train_both:
-            total_loss= total_loss+loss_net2
+            total_loss = total_loss+ p.signal_strength*cd_loss
+
+
         total_loss.backward()
         cd_loss_tot += cd_loss.item()
         opt.step()
@@ -215,7 +223,7 @@ for epoch in range(p.num_iters):
 
     print(dev_log_template.format(time.time() - start_time,
                                   epoch, iterations, 1 + batch_idx, len(train_iter),
-                                  100. * (1 + batch_idx) / len(train_iter), total_loss.data.item(), dev_loss.data.item(), 
+                                  100. * (1 + batch_idx) / len(train_iter), total_loss.data.item(), dev_loss.data.item(),  cd_loss_tot.item(),
                                   train_acc, dev_acc))
     # print progress message
     # print(log_template.format(time.time() - start_time,
@@ -228,7 +236,7 @@ for epoch in range(p.num_iters):
     s.accs_test[epoch] = dev_acc
     s.losses_train[epoch] = total_loss.data.item()
     s.losses_test[epoch] = dev_loss.data.item()
-    s.explanation_divergence[epoch] = cd_loss_tot
+    s.explanation_divergence[epoch] = deepcopy(cd_loss_tot)
     s.model_weights = deepcopy(model.state_dict())
     s.comp_model_weights = deepcopy(comp_model.state_dict())
     save(p,s,  out_name)
