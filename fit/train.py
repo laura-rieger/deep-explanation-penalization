@@ -11,6 +11,7 @@ from torchtext import data
 from torchtext import datasets
 from copy import deepcopy
 from model import LSTMSentiment
+from itertools import chain
 sys.path.append('../../acd/scores')
 import cd
 import random
@@ -21,13 +22,14 @@ def get_args():
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '../data/.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
-    parser.add_argument('--model', type=str, default='../models/init_models/model1.pt')
-    parser.add_argument('--comparison_model', type=str, default='../models/init_models/model2.pt')
+    parser.add_argument('--model', type=str, default='../models/init_models/model1_kort.pt')
+    parser.add_argument('--comparison_model', type=str, default='../models/init_models/model2_kort.pt')
     parser.add_argument('--train_both', type=int, default=1)
     parser.add_argument('--signal_strength', type=float, default=1.0)
-    parser.add_argument('--sparse_signal', type=int, default=1)
+    parser.add_argument('--sparse_signal', type=int, default=0)
     parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
     parser.add_argument('--n_layers', type=int, default=1)
+    
     args = parser.parse_args()
     return args
 
@@ -52,6 +54,7 @@ args = get_args()
 from params_fit import p # get parameters
 from params_save import S # class to save objects
 p.sparse_signal = bool(args.sparse_signal)
+
 p.train_both = bool(args.train_both)
 p.signal_strength = args.signal_strength
 
@@ -96,17 +99,24 @@ config.n_cells = config.n_layers
 if config.birnn:
     config.n_cells *= 2
 
-
-if args.model:
-    model = torch.load(args.model, map_location=lambda storage, location: storage.cuda(args.gpu))
-else:
-    model = LSTMSentiment(config)
-    if args.word_vectors:
-        model.embed.weight.data = inputs.vocab.vectors
-        model.cuda()
+model = torch.load(args.model, map_location=lambda storage, location: storage.cuda(args.gpu))
+# TODO error search for why model 2 does not train - if the model is not preloaded, something has gone wrong
+# if args.model:
+    # model = torch.load(args.model, map_location=lambda storage, location: storage.cuda(args.gpu))
+# else:
+    # model = LSTMSentiment(config)
+    # if args.word_vectors:
+        # model.embed.weight.data = inputs.vocab.vectors
+        # model.cuda()
 
 criterion = nn.CrossEntropyLoss()
-opt = O.Adam(model.parameters())  # , lr=args.lr)
+if p.train_both:
+    params = chain(model.parameters(), comp_model.parameters())
+else:
+    params = model.parameters()
+ 
+opt = O.Adam(params)  # , lr=args.lr)
+
 # model.embed.requires_grad = False
 
 iterations = 0
@@ -153,6 +163,7 @@ for epoch in range(p.num_iters):
         loss_net1 = criterion(answer1, batch.label)
         loss_net2= criterion(answer2, batch.label)
         total_loss = loss_net1
+
         if p.train_both:
             total_loss= total_loss+loss_net2
         # calculate loss of the network output with respect to training labels
@@ -161,16 +172,20 @@ for epoch in range(p.num_iters):
         
         if p.sparse_signal:
             #mask = ((torch.max(answer1, 1)[1] != batch.label.data)*(torch.max(answer2, 1)[1] == batch.label.data)) # only use where one is correct
-            mask = (torch.max(answer1, 1)[1] != (torch.max(answer2, 1)[1])) # use where disagreement
+            #mask = (torch.max(answer1, 1)[1] != (torch.max(answer2, 1)[1])) # use where disagreement
+            mask =(torch.max(answer2, 1)[1] == batch.label.data) # use only where model2 is correct
             if mask.any():
             
                 cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop)).masked_select(mask).mean()    
+
                 total_loss = total_loss+ p.signal_strength*cd_loss
         
         else:
             cd_loss = (cd.cd_penalty(batch, model, comp_model, start, stop)).mean()
+
             total_loss = total_loss+ p.signal_strength*cd_loss
 
+     
 
         total_loss.backward()
         cd_loss_tot += cd_loss.item()
@@ -222,7 +237,7 @@ for epoch in range(p.num_iters):
 
     print(dev_log_template.format(time.time() - start_time,
                                   epoch, iterations, 1 + batch_idx, len(train_iter),
-                                  100. * (1 + batch_idx) / len(train_iter), total_loss.data.item(), dev_loss.data.item(),  cd_loss_tot.item(),
+                                  100. * (1 + batch_idx) / len(train_iter), total_loss.data, dev_loss.data,  cd_loss_tot,
                                   train_acc, dev_acc))
     # print progress message
     # print(log_template.format(time.time() - start_time,
@@ -231,10 +246,11 @@ for epoch in range(p.num_iters):
                                   # n_correct / n_total * 100, ' ' * 12))
     
     # save things
-    s.accs_train[epoch] = train_acc.item()
+    s.accs_train[epoch] = train_acc 
+    #.item()
     s.accs_test[epoch] = dev_acc
-    s.losses_train[epoch] = total_loss.data.item()
-    s.losses_test[epoch] = dev_loss.data.item()
+    s.losses_train[epoch] = total_loss.data#.item()
+    s.losses_test[epoch] = dev_loss.data #.item()
     s.explanation_divergence[epoch] = deepcopy(cd_loss_tot)
     s.model_weights = deepcopy(model.state_dict())
     s.comp_model_weights = deepcopy(comp_model.state_dict())

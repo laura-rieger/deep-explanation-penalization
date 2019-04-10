@@ -297,13 +297,38 @@ def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
     return scores
 def softmax_out(output):
     return torch.nn.functional.softmax(torch.stack((output[0].reshape(-1),output[1].reshape(-1)), 1), dim = 1)
+def is_in_relevant(batch, start, stop,  class_rules,dim =0):
 
+    #XXX only for current model where relevant bigger five
+    rel_digits = ((batch.label ==class_rules[0][0])[None, :] *(batch.text ==class_rules[0][1])) + (batch.label ==class_rules[1][0])[None, :] *(batch.text ==class_rules[1][1])
+    relevant = rel_digits[start:stop].sum(dim=0)
+    irrelevant = rel_digits.sum(dim=0) - relevant
+    test_out = torch.cat((relevant[:, None], irrelevant[:, None]), 1)
+    test_out = test_out/ test_out.sum(dim=1)[:, None]
+    return test_out
+    
+
+def cd_penalty_for_one(batch, model1, start, stop,class_rules):
+   # get output
+    model1_output = cd_batch_text(batch, model1, start, stop)
+    # only use the correct class
+    correct_idx = (batch.label, torch.arange(batch.label.shape[0]))
+    model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
+    model2_softmax = is_in_relevant(batch, start, stop,class_rules).cuda().float()
+    
+   
+    output = -(torch.log(model1_softmax)*model2_softmax).sum() 
+ 
+    return output
+
+    #return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).mean() 
 def cd_penalty(batch, model1, model2, start, stop):
    
     model1_output = cd_batch_text(batch, model1, start, stop)
     model2_output = cd_batch_text(batch, model2, start, stop)
     model1_softmax = softmax_out(model1_output)
     model2_softmax = softmax_out(model2_output)
+    
 
     return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).sum(dim=1).reshape((2,-1)).sum(dim=0)
         
