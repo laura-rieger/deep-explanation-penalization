@@ -212,7 +212,92 @@ def cd_batch_text(batch, model, start, stop, my_device = 0):
     return scores, irrel_scores
 
 
+def cd_text_irreg_scores(batch, model, start, stop, batch_id = 0,my_device = 0):
+# rework for start and stop being not constant for each
+    weights = model.lstm.state_dict()
 
+    # Index one = word vector (i) or hidden state (h), index two = gate
+    W_ii, W_if, W_ig, W_io = torch.chunk(weights['weight_ih_l0'], 4, 0)
+    W_hi, W_hf, W_hg, W_ho = torch.chunk(weights['weight_hh_l0'], 4, 0)
+    b_i, b_f, b_g, b_o = torch.chunk(weights['bias_ih_l0'] + weights['bias_hh_l0'], 4)
+    word_vecs = model.embed(batch.text)[:, batch_id].data
+    T = word_vecs.shape[0]
+    relevant = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
+    irrelevant = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
+    relevant_h = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
+    irrelevant_h = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
+    for i in range(T):
+        if i > 0:
+            prev_rel_h = relevant_h[i - 1]
+            prev_irrel_h = irrelevant_h[i - 1]
+        else:
+            prev_rel_h = torch.zeros(model.hidden_dim, device =torch.device(my_device))
+            prev_irrel_h = torch.zeros(model.hidden_dim, device =torch.device(my_device))
+        
+        rel_i = torch.matmul(W_hi, prev_rel_h)
+        
+        rel_g = torch.matmul(W_hg, prev_rel_h)
+        rel_f = torch.matmul(W_hf, prev_rel_h)
+        rel_o = torch.matmul(W_ho, prev_rel_h)
+        irrel_i = torch.matmul(W_hi, prev_irrel_h)
+        irrel_g = torch.matmul(W_hg, prev_irrel_h)
+        irrel_f = torch.matmul(W_hf, prev_irrel_h)
+        irrel_o = torch.matmul(W_ho, prev_irrel_h)
+        # calc out the contrib for each
+        w_ii_contrib = torch.matmul(W_ii, word_vecs[i])
+        w_ig_contrib = torch.matmul(W_ig, word_vecs[i])
+        w_if_contrib = torch.matmul(W_if, word_vecs[i])
+        w_io_contrib = torch.matmul(W_io, word_vecs[i])
+        rel_i = (i >= start and i <= stop)
+
+        if i >= start and i <= stop:
+
+        
+            rel_i = rel_i + torch.matmul(W_ii, word_vecs[i])
+            rel_g = rel_g + torch.matmul(W_ig, word_vecs[i])
+            rel_f = rel_f + torch.matmul(W_if, word_vecs[i])
+            rel_o = rel_o + torch.matmul(W_io, word_vecs[i])
+        else:
+            irrel_i = irrel_i + torch.matmul(W_ii, word_vecs[i])
+            irrel_g = irrel_g + torch.matmul(W_ig, word_vecs[i])
+            irrel_f = irrel_f + torch.matmul(W_if, word_vecs[i])
+            irrel_o = irrel_o + torch.matmul(W_io, word_vecs[i])
+
+        rel_contrib_i, irrel_contrib_i, bias_contrib_i = propagate_three(rel_i, irrel_i, b_i, sigmoid)
+        rel_contrib_g, irrel_contrib_g, bias_contrib_g = propagate_three(rel_g, irrel_g, b_g, tanh)
+
+        relevant[i] = rel_contrib_i * (rel_contrib_g + bias_contrib_g) + bias_contrib_i * rel_contrib_g
+        irrelevant[i] = irrel_contrib_i * (rel_contrib_g + irrel_contrib_g + bias_contrib_g) + (
+                                                                                                   rel_contrib_i + bias_contrib_i) * irrel_contrib_g
+
+        if i >= start and i < stop:
+            relevant[i] += bias_contrib_i * bias_contrib_g
+        else:
+            irrelevant[i] += bias_contrib_i * bias_contrib_g
+
+        if i > 0:
+            rel_contrib_f, irrel_contrib_f, bias_contrib_f = propagate_three(rel_f, irrel_f, b_f, sigmoid)
+            relevant[i] += (rel_contrib_f + bias_contrib_f) * relevant[i - 1]
+            irrelevant[i] += (rel_contrib_f + irrel_contrib_f + bias_contrib_f) * irrelevant[i - 1] + irrel_contrib_f * \
+                                                                                                      relevant[i - 1]
+
+        o = sigmoid(torch.matmul(W_io, word_vecs[i]) + torch.matmul(W_ho, prev_rel_h + prev_irrel_h) + b_o)
+        rel_contrib_o, irrel_contrib_o, bias_contrib_o = propagate_three(rel_o, irrel_o, b_o, sigmoid)
+        new_rel_h, new_irrel_h = propagate_tanh_two(relevant[i], irrelevant[i])
+        # relevant_h[i] = new_rel_h * (rel_contrib_o + bias_contrib_o)
+        # irrelevant_h[i] = new_rel_h * (irrel_contrib_o) + new_irrel_h * (rel_contrib_o + irrel_contrib_o + bias_contrib_o)
+        relevant_h[i] = o * new_rel_h
+        irrelevant_h[i] = o * new_irrel_h
+
+    W_out = model.hidden_to_label.weight.data
+
+    # Sanity check: scores + irrel_scores should equal the LSTM's output minus model.hidden_to_label.bias
+    scores = torch.matmul(W_out, relevant_h[T - 1])
+    irrel_scores = torch.matmul(W_out, irrelevant_h[T - 1])
+    #tolerance = 0.001
+    assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
+    
+    return scores
 
 
 def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
@@ -300,11 +385,11 @@ def softmax_out(output):
 def is_in_relevant(batch, start, stop,  class_rules,dim =0):
 
     #XXX only for current model where relevant bigger five
-    rel_digits = ((batch.label ==class_rules[0][0])[None, :] *(batch.text ==class_rules[0][1])) + (batch.label ==class_rules[1][0])[None, :] *(batch.text ==class_rules[1][1])
+    rel_digits = ((batch.label ==0)[None, :] *(batch.text ==class_rules[0])) + (batch.label ==1)[None, :] *(batch.text ==class_rules[1])
     relevant = rel_digits[start:stop].sum(dim=0)
     irrelevant = rel_digits.sum(dim=0) - relevant
     test_out = torch.cat((relevant[:, None], irrelevant[:, None]), 1)
-    test_out = test_out/ test_out.sum(dim=1)[:, None]
+
     return test_out
     
 
@@ -317,8 +402,13 @@ def cd_penalty_for_one(batch, model1, start, stop,class_rules):
     model2_softmax = is_in_relevant(batch, start, stop,class_rules).cuda().float()
     
    
-    output = -(torch.log(model1_softmax)*model2_softmax).sum() 
- 
+    output = -(torch.log(model1_softmax)*model2_softmax).mean() 
+    #print(model1_softmax)
+    if output.data > 10:
+        print(model1_softmax)
+        print(model2_softmax)
+    assert output.data < 10
+    
     return output
 
     #return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).mean() 
