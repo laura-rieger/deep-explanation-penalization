@@ -108,4 +108,4 @@ models/trained_models
 acd
 **_cache
 **.pkl
-results/
+old_results/

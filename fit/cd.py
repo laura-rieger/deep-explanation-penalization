@@ -1,11 +1,10 @@
 import torch
 import torch.nn.functional as F
 from copy import deepcopy
-import numpy as np
 #from scipy.special import expit as sigmoid
 from torch import sigmoid 
 from torch import tanh
-
+import numpy as np
 # propagate a three-part
 def propagate_three(a, b, c, activation):
     a_contrib = 0.5 * (activation(a + c) - activation(c) + activation(a + b + c) - activation(b + c))
@@ -211,31 +210,25 @@ def cd_batch_text(batch, model, start, stop, my_device = 0):
     #assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
     return scores, irrel_scores
 
-
-def cd_text_irreg_scores(batch, model, start, stop, batch_id = 0,my_device = 0):
-# rework for start and stop being not constant for each
-    weights = model.lstm.state_dict()
+def cd_text_irreg_scores(batch, model, start, stop, my_device = 0):
+    weights = model.lstm
 
     # Index one = word vector (i) or hidden state (h), index two = gate
-    W_ii, W_if, W_ig, W_io = torch.chunk(weights['weight_ih_l0'], 4, 0)
-    W_hi, W_hf, W_hg, W_ho = torch.chunk(weights['weight_hh_l0'], 4, 0)
-    b_i, b_f, b_g, b_o = torch.chunk(weights['bias_ih_l0'] + weights['bias_hh_l0'], 4)
-    word_vecs = model.embed(batch.text)[:, batch_id].data
+    W_ii, W_if, W_ig, W_io = torch.chunk(weights.weight_ih_l0, 4, 0)
+    W_hi, W_hf, W_hg, W_ho = torch.chunk(weights.weight_hh_l0, 4, 0)
+    b_i, b_f, b_g, b_o = torch.chunk(weights.bias_ih_l0 + weights.bias_hh_l0, 4)
+    word_vecs = torch.transpose(model.embed(batch.text).data, 1,2) #change: we take all
     T = word_vecs.shape[0]
-    relevant = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
-    irrelevant = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
-    relevant_h = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
-    irrelevant_h = torch.zeros((T, model.hidden_dim), device =torch.device(my_device))
+    batch_size = word_vecs.shape[2]
+    relevant_h = torch.zeros(( model.hidden_dim,batch_size), device =torch.device(my_device), requires_grad=False)
+    irrelevant_h = torch.zeros((model.hidden_dim,batch_size), device =torch.device(my_device), requires_grad=False)
+    prev_rel = torch.zeros((  model.hidden_dim,batch_size), device =torch.device(my_device), requires_grad=False)
+    prev_irrel = torch.zeros((  model.hidden_dim,batch_size), device =torch.device(my_device), requires_grad=False)
+   
     for i in range(T):
-        if i > 0:
-            prev_rel_h = relevant_h[i - 1]
-            prev_irrel_h = irrelevant_h[i - 1]
-        else:
-            prev_rel_h = torch.zeros(model.hidden_dim, device =torch.device(my_device))
-            prev_irrel_h = torch.zeros(model.hidden_dim, device =torch.device(my_device))
-        
+        prev_rel_h = relevant_h
+        prev_irrel_h = irrelevant_h
         rel_i = torch.matmul(W_hi, prev_rel_h)
-        
         rel_g = torch.matmul(W_hg, prev_rel_h)
         rel_f = torch.matmul(W_hf, prev_rel_h)
         rel_o = torch.matmul(W_ho, prev_rel_h)
@@ -243,61 +236,66 @@ def cd_text_irreg_scores(batch, model, start, stop, batch_id = 0,my_device = 0):
         irrel_g = torch.matmul(W_hg, prev_irrel_h)
         irrel_f = torch.matmul(W_hf, prev_irrel_h)
         irrel_o = torch.matmul(W_ho, prev_irrel_h)
-        # calc out the contrib for each
+        
+        
         w_ii_contrib = torch.matmul(W_ii, word_vecs[i])
         w_ig_contrib = torch.matmul(W_ig, word_vecs[i])
         w_if_contrib = torch.matmul(W_if, word_vecs[i])
         w_io_contrib = torch.matmul(W_io, word_vecs[i])
-        rel_i = (i >= start and i <= stop)
 
-        if i >= start and i <= stop:
 
+        is_in_relevant = ((start <= i) * (i <= stop)).cuda().float() 
+        is_not_in_relevant = 1 - is_in_relevant
+
+       
         
-            rel_i = rel_i + torch.matmul(W_ii, word_vecs[i])
-            rel_g = rel_g + torch.matmul(W_ig, word_vecs[i])
-            rel_f = rel_f + torch.matmul(W_if, word_vecs[i])
-            rel_o = rel_o + torch.matmul(W_io, word_vecs[i])
-        else:
-            irrel_i = irrel_i + torch.matmul(W_ii, word_vecs[i])
-            irrel_g = irrel_g + torch.matmul(W_ig, word_vecs[i])
-            irrel_f = irrel_f + torch.matmul(W_if, word_vecs[i])
-            irrel_o = irrel_o + torch.matmul(W_io, word_vecs[i])
+        rel_i = rel_i + is_in_relevant * w_ii_contrib
+        rel_g = rel_g + is_in_relevant * w_ig_contrib
+        rel_f = rel_f + is_in_relevant * w_if_contrib
+        rel_o = rel_o + is_in_relevant * w_io_contrib
+        
+        irrel_i = irrel_i + is_not_in_relevant * w_ii_contrib
+        irrel_g = irrel_g + is_not_in_relevant * w_ig_contrib
+        irrel_f = irrel_f + is_not_in_relevant * w_if_contrib
+        irrel_o = irrel_o + is_not_in_relevant * w_io_contrib
 
-        rel_contrib_i, irrel_contrib_i, bias_contrib_i = propagate_three(rel_i, irrel_i, b_i, sigmoid)
-        rel_contrib_g, irrel_contrib_g, bias_contrib_g = propagate_three(rel_g, irrel_g, b_g, tanh)
+        rel_contrib_i, irrel_contrib_i, bias_contrib_i = propagate_three(rel_i, irrel_i, b_i[:,None], sigmoid)
+        rel_contrib_g, irrel_contrib_g, bias_contrib_g = propagate_three(rel_g, irrel_g, b_g[:,None], tanh)
 
-        relevant[i] = rel_contrib_i * (rel_contrib_g + bias_contrib_g) + bias_contrib_i * rel_contrib_g
-        irrelevant[i] = irrel_contrib_i * (rel_contrib_g + irrel_contrib_g + bias_contrib_g) + (
-                                                                                                   rel_contrib_i + bias_contrib_i) * irrel_contrib_g
+        relevant = rel_contrib_i * (rel_contrib_g + bias_contrib_g) + bias_contrib_i * rel_contrib_g
+        irrelevant = irrel_contrib_i * (rel_contrib_g + irrel_contrib_g + bias_contrib_g) + (rel_contrib_i + bias_contrib_i) * irrel_contrib_g
+        bias_contrib =bias_contrib_i * bias_contrib_g
 
-        if i >= start and i < stop:
-            relevant[i] += bias_contrib_i * bias_contrib_g
-        else:
-            irrelevant[i] += bias_contrib_i * bias_contrib_g
+        is_in_relevant_bias = ((start <= i) * (i < stop)).cuda().float() 
+        is_not_in_relevant_bias = 1- is_in_relevant_bias  
 
-        if i > 0:
-            rel_contrib_f, irrel_contrib_f, bias_contrib_f = propagate_three(rel_f, irrel_f, b_f, sigmoid)
-            relevant[i] += (rel_contrib_f + bias_contrib_f) * relevant[i - 1]
-            irrelevant[i] += (rel_contrib_f + irrel_contrib_f + bias_contrib_f) * irrelevant[i - 1] + irrel_contrib_f * \
-                                                                                                      relevant[i - 1]
 
-        o = sigmoid(torch.matmul(W_io, word_vecs[i]) + torch.matmul(W_ho, prev_rel_h + prev_irrel_h) + b_o)
-        rel_contrib_o, irrel_contrib_o, bias_contrib_o = propagate_three(rel_o, irrel_o, b_o, sigmoid)
-        new_rel_h, new_irrel_h = propagate_tanh_two(relevant[i], irrelevant[i])
-        # relevant_h[i] = new_rel_h * (rel_contrib_o + bias_contrib_o)
-        # irrelevant_h[i] = new_rel_h * (irrel_contrib_o) + new_irrel_h * (rel_contrib_o + irrel_contrib_o + bias_contrib_o)
-        relevant_h[i] = o * new_rel_h
-        irrelevant_h[i] = o * new_irrel_h
+        relevant =relevant + is_in_relevant_bias*bias_contrib
 
-    W_out = model.hidden_to_label.weight.data
+        irrelevant =irrelevant + is_not_in_relevant_bias*bias_contrib
 
-    # Sanity check: scores + irrel_scores should equal the LSTM's output minus model.hidden_to_label.bias
-    scores = torch.matmul(W_out, relevant_h[T - 1])
-    irrel_scores = torch.matmul(W_out, irrelevant_h[T - 1])
-    #tolerance = 0.001
-    assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
+        if i > 0: 
+            rel_contrib_f, irrel_contrib_f, bias_contrib_f = propagate_three(rel_f, irrel_f, b_f[:,None], sigmoid)
+            relevant = relevant +(rel_contrib_f + bias_contrib_f) * prev_rel
+            irrelevant = irrelevant+(rel_contrib_f + irrel_contrib_f + bias_contrib_f) * prev_irrel + irrel_contrib_f *  prev_rel
+
+        o = sigmoid(torch.matmul(W_io, word_vecs[i]) + torch.matmul(W_ho, prev_rel_h + prev_irrel_h) + b_o[:,None])
+
+     
+        new_rel_h, new_irrel_h = propagate_tanh_two(relevant, irrelevant)
+      
+        relevant_h = o * new_rel_h
+        irrelevant_h = o * new_irrel_h
+        prev_rel = relevant
+        prev_irrel = irrelevant
     
-    return scores
+    W_out = model.hidden_to_label.weight
+    # Sanity check: scores + irrel_scores should equal the LSTM's output minus model.hidden_to_label.bias
+    
+    scores = torch.matmul(W_out, relevant_h)
+    irrel_scores = torch.matmul(W_out, irrelevant_h)
+
+    return scores, irrel_scores
 
 
 def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
@@ -332,7 +330,7 @@ def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
         irrel_f = torch.matmul(W_hf, prev_irrel_h)
         irrel_o = torch.matmul(W_ho, prev_irrel_h)
 
-        if i >= start and i <= stop:
+        if start <= i <= stop:
 
         
             rel_i = rel_i + torch.matmul(W_ii, word_vecs[i])
@@ -352,7 +350,7 @@ def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
         irrelevant[i] = irrel_contrib_i * (rel_contrib_g + irrel_contrib_g + bias_contrib_g) + (
                                                                                                    rel_contrib_i + bias_contrib_i) * irrel_contrib_g
 
-        if i >= start and i < stop:
+        if start <= i <= stop:
             relevant[i] += bias_contrib_i * bias_contrib_g
         else:
             irrelevant[i] += bias_contrib_i * bias_contrib_g
@@ -364,10 +362,9 @@ def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
                                                                                                       relevant[i - 1]
 
         o = sigmoid(torch.matmul(W_io, word_vecs[i]) + torch.matmul(W_ho, prev_rel_h + prev_irrel_h) + b_o)
-        rel_contrib_o, irrel_contrib_o, bias_contrib_o = propagate_three(rel_o, irrel_o, b_o, sigmoid)
+        #rel_contrib_o, irrel_contrib_o, bias_contrib_o = propagate_three(rel_o, irrel_o, b_o, sigmoid)
         new_rel_h, new_irrel_h = propagate_tanh_two(relevant[i], irrelevant[i])
-        # relevant_h[i] = new_rel_h * (rel_contrib_o + bias_contrib_o)
-        # irrelevant_h[i] = new_rel_h * (irrel_contrib_o) + new_irrel_h * (rel_contrib_o + irrel_contrib_o + bias_contrib_o)
+
         relevant_h[i] = o * new_rel_h
         irrelevant_h[i] = o * new_irrel_h
 
@@ -376,42 +373,71 @@ def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
     # Sanity check: scores + irrel_scores should equal the LSTM's output minus model.hidden_to_label.bias
     scores = torch.matmul(W_out, relevant_h[T - 1])
     irrel_scores = torch.matmul(W_out, irrelevant_h[T - 1])
-    #tolerance = 0.001
+    tolerance = 0.001
     assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
     
     return scores
 def softmax_out(output):
     return torch.nn.functional.softmax(torch.stack((output[0].reshape(-1),output[1].reshape(-1)), 1), dim = 1)
-def is_in_relevant(batch, start, stop,  class_rules,dim =0):
+    
+def is_in_relevant_toy(batch, start, stop,  class_rules):
 
     #XXX only for current model where relevant bigger five
     rel_digits = ((batch.label ==0)[None, :] *(batch.text ==class_rules[0])) + (batch.label ==1)[None, :] *(batch.text ==class_rules[1])
     relevant = rel_digits[start:stop].sum(dim=0)
     irrelevant = rel_digits.sum(dim=0) - relevant
     test_out = torch.cat((relevant[:, None], irrelevant[:, None]), 1)
-
     return test_out
-    
 
-def cd_penalty_for_one(batch, model1, start, stop,class_rules):
+def cd_penalty_for_one_toy(batch, model1, start, stop,class_rules):
    # get output
     model1_output = cd_batch_text(batch, model1, start, stop)
     # only use the correct class
     correct_idx = (batch.label, torch.arange(batch.label.shape[0]))
     model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
-    model2_softmax = is_in_relevant(batch, start, stop,class_rules).cuda().float()
-    
-   
+    model2_softmax = is_in_relevant_toy(batch, start, stop,class_rules).cuda().float()
     output = -(torch.log(model1_softmax)*model2_softmax).mean() 
-    #print(model1_softmax)
-    if output.data > 10:
-        print(model1_softmax)
-        print(model2_softmax)
-    assert output.data < 10
+    return output
+def is_in_relevant_decoy(batch, start, stop,  class_rules):
+    is_decoy = ((batch.label ==0) *(batch.text[start:stop] ==class_rules[0]) + (batch.label ==1) *(batch.text[start:stop] ==class_rules[1]))
+    return is_decoy.sum(dim=0)
+     
+def cd_penalty_for_one_decoy(batch, model1, start, stop,class_rules):
+
+    model1_output = cd_batch_text(batch, model1, start, stop)
+    correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
+    model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
+    mask_decoy_in_relevant = is_in_relevant_decoy(batch, start, stop,class_rules).cuda()
+    if mask_decoy_in_relevant.byte().any():
+   
+        masked_relevant = model1_softmax[:,1].masked_select(mask_decoy_in_relevant.byte())
+        output = -(torch.log(masked_relevant)).mean() 
+        return output
+    else: 
+        return torch.zeros(1).cuda()
+def cd_penalty_annotated(batch, model1, stop, scores):
+
+    model1_output = cd_text_irreg_scores(batch, model1, 0, stop)
+    correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
     
+    model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
+    mask_relevant = (scores != 0.5).cuda()
+    if mask_relevant.byte().any():
+    
+        output = -(torch.log(model1_softmax[:,1])*scores.float()).mean() #.masked_select(mask_relevant.byte()).mean()
+        return output
+    else: 
+            return torch.zeros(1).cuda()
+    
+def cd_penalty_for_one_decoy_all(batch, model1, start, stop):
+
+    model1_output = cd_text_irreg_scores(batch, model1, start, stop)
+    correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
+    model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
+    
+    output = -(torch.log(model1_softmax[:,1])).mean() 
     return output
 
-    #return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).mean() 
 def cd_penalty(batch, model1, model2, start, stop):
    
     model1_output = cd_batch_text(batch, model1, start, stop)

@@ -7,8 +7,8 @@ class p:
     signal_strength = 1.0 # how much to weight kl-divergence
     starting_folder = '../models/init_models/' # folder that store initial models
     num_iters = 5 # how many epochs to train for
-    seed = 0 # random seed
-
+    seed = 42 # random seed
+    
     out_dir = '../models/trained_models/' # directory to save to
     
 

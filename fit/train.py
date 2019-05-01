@@ -82,7 +82,7 @@ if args.word_vectors:
 answers.build_vocab(train)
 
 train_iter, dev_iter, test_iter = data.BucketIterator.splits(
-    (train, dev, test), batch_size=args.batch_size, device=torch.device(args.gpu))
+    (train, dev, test), batch_size=args.batch_size, sort_key=lambda x: len(x.text), sort = True, device=torch.device(args.gpu))
 
 config = args
 if config.comparison_model and os.path.isfile(config.comparison_model):
