@@ -415,19 +415,21 @@ def cd_penalty_for_one_decoy(batch, model1, start, stop,class_rules):
         return output
     else: 
         return torch.zeros(1).cuda()
-def cd_penalty_annotated(batch, model1, stop, scores):
-
-    model1_output = cd_text_irreg_scores(batch, model1, 0, stop)
-    correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
-    
-    model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
+def cd_penalty_annotated(batch, model1, stop, scores, irreg_scores):
     mask_relevant = (scores != 0.5).cuda()
     if mask_relevant.byte().any():
-    
-        output = -(torch.log(model1_softmax[:,1])*scores.float()).mean() #.masked_select(mask_relevant.byte()).mean()
+
+        model1_output = cd_text_irreg_scores(batch, model1, 0, stop)
+        correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
+        
+        model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
+
+        output = -((torch.log(model1_softmax[:,0])*scores.float()) +(torch.log(model1_softmax[:,1])*irreg_scores.float())).masked_select(mask_relevant.byte()).mean() 
         return output
     else: 
-            return torch.zeros(1).cuda()
+        return torch.zeros(1).cuda()
+    
+
     
 def cd_penalty_for_one_decoy_all(batch, model1, start, stop):
 

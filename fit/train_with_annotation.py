@@ -19,17 +19,17 @@ import random
 import pickle as pkl 
 def get_args():
     parser = ArgumentParser(description='PyTorch/torchtext SST')
-    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '../data/.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
     parser.add_argument('--dataset_path', type=str, default='../data')
-    parser.add_argument('--signal_strength', type=float, default=.000001)
+    parser.add_argument('--signal_strength', type=float, default=1.0)
     parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
     parser.add_argument('--n_layers', type=int, default=1)
     parser.add_argument('--which_adversarial', type=str, default='annotated')
     parser.add_argument('--resume_snapshot', type=str, default='')
-    parser.add_argument('--decoy_strength', type=float, default=0.1)
+    parser.add_argument('--decoy_strength', type=float, default=0.0)
     parser.add_argument('--d_embed', type=int, default=300)
     parser.add_argument('--d_proj', type=int, default=300)
     parser.add_argument('--d_hidden', type=int, default=128)
@@ -136,7 +136,7 @@ train_iter.repeat = False
 header = '  Time Epoch     Loss   Dev/Loss  CD Loss    Accuracy  Dev/Accuracy'
 dev_log_template = ' '.join(
     '{:6.0f},{:5.0f},{:9.4f},{:8.6f},{:8.6f},{:12.4f},{:12.4f}'.split(','))
-print(len(train))
+
 print(header)
 
 
@@ -159,11 +159,11 @@ for epoch in range(p.num_iters):
       
         total_loss = criterion(answer, batch.label)
         train_loss_tot += total_loss.data.item()
+        cd_loss = cd.cd_penalty_annotated(batch, model, batch.stop_pos, batch.segment1_label, batch.segment2_label) 
         if p.signal_strength != 0:
-            cd_loss = cd.cd_penalty_annotated(batch, model, batch.stop_pos, batch.segment1_label) 
-            total_loss = total_loss+ p.signal_strength*cd_loss
-        else: 
-            cd_loss = torch.zeros(1)
+            
+            total_loss = p.signal_strength*cd_loss + total_loss 
+
         #print(cd_loss.data)
         cd_loss_tot +=cd_loss.data.item()
         total_loss.backward()
@@ -195,11 +195,11 @@ for epoch in range(p.num_iters):
     s.accs_test[epoch] = dev_acc
     s.decoy_strength= decoy_strength
     s.use_individual = use_individual
-     
+    s.num_in_training = len(train)
     s.losses_train[epoch] = total_loss.data.item()
     s.losses_test[epoch] = dev_loss.data #.item()
     s.explanation_divergence[epoch] = deepcopy(cd_loss_tot / len(train))
-    s.model_weights = deepcopy(model.state_dict())
+    #s.model_weights = deepcopy(model.state_dict())
     
     
 save(p,s,  out_name)

@@ -5,7 +5,7 @@ import os
 
 # sweep different ways to initialize weights= 
 params_to_vary = {
-    'signal_strength':  [ 0, 0.01, 0.1,   1, 10, 100  ]    ,
+    'signal_strength':  [ 0,0.01,0.1,1,10]    ,
 }
 
 ks = sorted(params_to_vary.keys())
@@ -17,12 +17,12 @@ print(param_combinations)
 
 # iterate
 import os
-
-for i in range(len(param_combinations)):
-    param_str = 'python train_with_annotation.py '
-    for j, key in enumerate(ks):
-        param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
-    #s.run(param_str)
-    print(param_str)
-    os.system(param_str)
-    
+for j in range(5):
+    for i in range(len(param_combinations)):
+        param_str = 'python train_with_annotation.py '
+        for j, key in enumerate(ks):
+            param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
+        #s.run(param_str)
+        print(param_str)
+        os.system(param_str)
+        
