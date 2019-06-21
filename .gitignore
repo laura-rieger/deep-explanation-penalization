@@ -109,3 +109,6 @@ acd
 **_cache
 **.pkl
 results/
+*.jpg
+*.csv
+*.tar
