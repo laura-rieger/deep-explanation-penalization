@@ -1,0 +1,11 @@
+\begin{tabular}{lrrrrr}
+\toprule
+{} &  Test accuracy &  Train accuracy &  Test loss &  Color accuracy &     CD \\
+regularizer\_rate &                &                 &            &                 &        \\
+\midrule
+0.0              &          0.468 &         100.000 &     13.606 &          92.040 &  0.000 \\
+0.1              &          4.242 &          99.453 &     11.171 &          79.674 &  0.026 \\
+1.0              &          2.130 &          98.594 &     12.730 &          84.330 &  0.001 \\
+10.0             &         29.922 &          51.172 &     13.301 &          16.812 &  2.138 \\
+\bottomrule
+\end{tabular}

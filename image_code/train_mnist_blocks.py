@@ -27,7 +27,6 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(3, 20, 5, 1)
-        
         self.conv2 = nn.Conv2d(20, 50, 5, 1)
 
         self.fc1 = nn.Linear(4*4*50, 500)
@@ -74,11 +73,11 @@ parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
                     help='SGD momentum (default: 0.5)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
-parser.add_argument('--seed', type=int, default=42, metavar='S',
+parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
-parser.add_argument('--regularizer_rate', type=float, default=0.0, metavar='N',
+parser.add_argument('--regularizer_rate', type=float, default=0.1, metavar='N',
                     help='how heavy to regularize lower order interaction (AKA color)')
 
 args = parser.parse_args()
@@ -88,7 +87,6 @@ regularizer_rate = args.regularizer_rate
 s.regularizer_rate = regularizer_rate
 num_blobs = 32
 s.num_blobs = num_blobs
-s.seed = args.seed
 
 torch.manual_seed(args.seed)
 
@@ -111,26 +109,27 @@ test_loader = utils.DataLoader(test_dataset,
 
 # make the sampling thing
 
+import numpy as np
+block_size  = 4
+num_blocks = int(24/block_size)
+blobs = np.zeros((num_blocks*num_blocks,24,24))
 
-blobs = np.zeros((28*28,28,28))
-for i in range(28):
-    for j in range(28):
-        blobs[i*28+j, i, j] =1
+for i in range(num_blocks):
+    for j in range(num_blocks):
+        blobs[i*num_blocks+j, i*block_size:(i+1)*block_size, j*block_size:(j+1)*block_size] =1
+blobs = np.pad(blobs,((0,0), (2,2), (2,2)), mode = 'minimum')
 
 
-prob = ((train_x_tensor).numpy().sum(axis = 1) !=-3).mean(axis = 0).reshape(-1)
-prob = ((train_x_tensor).numpy().sum(axis = 1) !=-3).mean(axis = 0).reshape(-1)
-prob /=prob.sum()
+prob = np.ones(36)/36
+
 model = Net().to(device)
 optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
 
 
-def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate, until_batch = -1):
+def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
-        if until_batch !=-1 and batch_idx > until_batch:
-            break
         data, target = data.to(device), target.to(device)
          
         optimizer.zero_grad()
@@ -139,16 +138,16 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
         
         if regularizer_rate !=0:
             add_loss = torch.zeros(1,).cuda()
-            blob_idxs = np.random.choice(28*28, size = num_blobs, p = prob)
+            blob_idxs = np.arange(36)
+
 
             for i in range(num_blobs): 
                 rel, irrel = cd.cd(blobs[blob_idxs[i]], data,model)
                 add_loss += torch.nn.functional.softmax(torch.stack((rel.view(-1),irrel.view(-1)), dim =1), dim = 1)[:,0].mean()
 
        
+   
             (regularizer_rate*add_loss+loss).backward()
- 
-            
         else:
             add_loss =torch.zeros(1,)
             loss.backward()
@@ -166,7 +165,6 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
             s.losses_train[epoch-1] = loss.item()
             s.accs_train[epoch-1] = acc
             s.cd[epoch-1] = add_loss.item()
-   
 
 
 def test(args, model, device, test_loader, epoch):
@@ -188,25 +186,17 @@ def test(args, model, device, test_loader, epoch):
         100. * correct / len(test_loader.dataset)))
     s.losses_test[epoch-1] = test_loss
     s.accs_test[epoch-1] = 100. * correct / len(test_loader.dataset)
-    return test_loss
 
 
- 
 
-best_model_weights = None
-best_test_loss = 100000
-# train(args, model, device, train_loader, optimizer, 0, 0, until_batch = 3)
+
+
 for epoch in range(1, args.epochs + 1):
-
     train(args, model, device, train_loader, optimizer, epoch, regularizer_rate)
-    test_loss = test(args, model, device, test_loader, epoch)
-    if test_loss < best_test_loss:
-        best_test_loss = test_loss
- 
-        best_model_weights = deepcopy(model.state_dict())
-s.model_weights = best_model_weights
+    test(args, model, device, test_loader, epoch)
+s.model_weights = deepcopy(model.state_dict())
 pid = ''.join(["%s" % np.random.randint(0, 9) for num in range(0, 20)])
-save(s,  pid)
+save(s,  pid+ "blocks")
 # if (args.save_model):
 
     # torch.save(model.state_dict(),oj(model_path, "color_mnist_cnn.pt"))

@@ -13,13 +13,12 @@ from torchtext import datasets
 from copy import deepcopy
 from model import LSTMSentiment
 
-sys.path.append('../../acd/scores')
 import cd
 import random
 import pickle as pkl 
 def get_args():
     parser = ArgumentParser(description='PyTorch/torchtext SST')
-    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '../data/.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
@@ -27,9 +26,11 @@ def get_args():
     parser.add_argument('--signal_strength', type=float, default=0.0)
     parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
     parser.add_argument('--n_layers', type=int, default=1)
-    parser.add_argument('--which_adversarial', type=str, default='decoy')
+    parser.add_argument('--which_adversarial', type=str, default='bias')
     parser.add_argument('--resume_snapshot', type=str, default='')
     parser.add_argument('--decoy_strength', type=float, default=100.0)
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                    help='random seed (default: 1)')
     parser.add_argument('--d_embed', type=int, default=300)
     parser.add_argument('--d_proj', type=int, default=300)
     parser.add_argument('--d_hidden', type=int, default=128)
@@ -48,9 +49,9 @@ def save(p, s, out_name):
 
 def seed(p):
     # set random seed        
-    np.random.seed(p.seed) 
+    np.random.seed(args.seed) 
     #torch.manual_seed(p.seed)    
-    random.seed(p.seed)
+    random.seed(args.seed)
 
 
 args = get_args()
@@ -58,7 +59,9 @@ dataset_path = args.dataset_path
 from params_fit import p # get parameters
 from params_save import S # class to save objects
 p.which_adversarial = args.which_adversarial
+p.out_dir = '../models/SST_biased_models/' 
 
+p.num_iters = 10
 p.signal_strength = args.signal_strength
 
 decoy_strength = args.decoy_strength
@@ -74,7 +77,7 @@ answers = data.Field(sequential=False, unk_token=None)
 tv_datafields = [ ("text", inputs), ("label", answers)]
 train, dev, test = TabularDataset.splits(
                            path=dataset_path, # the root directory where the data lies
-                           train='train_decoy_SST_' +str(decoy_strength)+'.csv', validation="dev_decoy_SST.csv", test = "test_decoy_SST.csv",
+                           train='train_bias_SST.csv', validation="dev_bias_SST.csv", test = "test_bias_SST.csv",
                            format='csv', 
                            skip_header=False, # if your csv header has a header, make sure to pass this to ensure it doesn't get proceesed as data!
                            fields=tv_datafields)
@@ -88,7 +91,7 @@ if args.word_vectors:
         os.makedirs(os.path.dirname(args.vector_cache), exist_ok=True)
         torch.save(inputs.vocab.vectors, args.vector_cache)
 answers.build_vocab(train)
-class_decoy = (inputs.vocab.stoi['text'], inputs.vocab.stoi['video'])
+class_decoy = (inputs.vocab.stoi['a'], inputs.vocab.stoi['the'])
 
 train_iter, dev_iter, test_iter = data.BucketIterator.splits(
     (train, dev, test), batch_size=args.batch_size, sort_key=lambda x: len(x.text), shuffle = True,sort_within_batch=True, sort = False,  device=torch.device(args.gpu))
@@ -139,8 +142,8 @@ for epoch in range(p.num_iters):
     n_correct, n_total, cd_loss_tot, train_loss_tot  = 0, 0, 0,0 
     
     for batch_idx, batch in tqdm(enumerate(train_iter)):
-        #if batch_idx >100:
-        #    break
+#        if batch_idx >10:
+#            break
  
 
 
@@ -162,15 +165,15 @@ for epoch in range(p.num_iters):
         total_loss = criterion(answer, batch.label)
         train_loss_tot += total_loss.data.item()
         if p.signal_strength >0:
-            # batch_length = batch.text.shape[0]
-            # if batch_length>1:
-                # start = np.random.randint(batch_length-1)
-            # else:
-                # start = 0
-            # stop = start + 1
+
      
             start = ((batch.text ==class_decoy[0]) + (batch.text == class_decoy[1])).argmax(dim = 0)
+            start[((batch.text ==class_decoy[0]) + (batch.text == class_decoy[1])).sum(dim=0) ==0] = -1 # if there is none, set to -1
+            
+            
             stop = start +1
+            #print(start)
+            
             
             cd_loss = cd.cd_penalty_for_one_decoy_all(batch, model, start, stop) 
             #print(cd_loss.data.item()/ total_loss.data.item())

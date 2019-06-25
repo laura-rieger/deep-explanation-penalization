@@ -210,14 +210,14 @@ def cd_batch_text(batch, model, start, stop, my_device = 0):
     #assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
     return scores, irrel_scores
 
-def cd_text_irreg_scores(batch, model, start, stop, my_device = 0):
+def cd_text_irreg_scores(batch_text, model, start, stop, my_device = 0):
     weights = model.lstm
 
     # Index one = word vector (i) or hidden state (h), index two = gate
     W_ii, W_if, W_ig, W_io = torch.chunk(weights.weight_ih_l0, 4, 0)
     W_hi, W_hf, W_hg, W_ho = torch.chunk(weights.weight_hh_l0, 4, 0)
     b_i, b_f, b_g, b_o = torch.chunk(weights.bias_ih_l0 + weights.bias_hh_l0, 4)
-    word_vecs = torch.transpose(model.embed(batch.text).data, 1,2) #change: we take all
+    word_vecs = torch.transpose(model.embed(batch_text).data, 1,2) #change: we take all
     T = word_vecs.shape[0]
     batch_size = word_vecs.shape[2]
     relevant_h = torch.zeros(( model.hidden_dim,batch_size), device =torch.device(my_device), requires_grad=False)
@@ -268,8 +268,6 @@ def cd_text_irreg_scores(batch, model, start, stop, my_device = 0):
 
         is_in_relevant_bias = ((start <= i) * (i < stop)).cuda().float() 
         is_not_in_relevant_bias = 1- is_in_relevant_bias  
-
-
         relevant =relevant + is_in_relevant_bias*bias_contrib
 
         irrelevant =irrelevant + is_not_in_relevant_bias*bias_contrib
@@ -415,30 +413,52 @@ def cd_penalty_for_one_decoy(batch, model1, start, stop,class_rules):
         return output
     else: 
         return torch.zeros(1).cuda()
-def cd_penalty_annotated(batch, model1, stop, scores, irreg_scores):
-    mask_relevant = (scores != 0.5).cuda()
-    if mask_relevant.byte().any():
-
-        model1_output = cd_text_irreg_scores(batch, model1, 0, stop)
-        correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
         
-        model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
-
-        output = -((torch.log(model1_softmax[:,0])*scores.float()) +(torch.log(model1_softmax[:,1])*irreg_scores.float())).masked_select(mask_relevant.byte()).mean() 
-        return output
-    else: 
-        return torch.zeros(1).cuda()
+        
+        
+        
+def cd_penalty_annotated(batch, model1, start, stop, scores):
+    # get index where annotation present:
+    idx_nonzero = (start != -1).nonzero()[:,0] # find the ones where annotation exists
+    model_output = cd_text_irreg_scores(batch.text[:, idx_nonzero], model1, start[ idx_nonzero], stop[idx_nonzero])[0]  #get the output and focus on relevant scores for class 0 vs 1
+    model_softmax = torch.nn.functional.softmax(model_output, dim =0)[batch.label[idx_nonzero],np.arange(len(idx_nonzero))] #take softmax of class 0 vs 1 and take the correct digit
+    output = -(torch.log(model_softmax)*scores[ idx_nonzero].float()).mean() #-(torch.log(1-model_softmax)*(1- scores[ idx_nonzero]).float() ).mean() #if it agrees, maximize - if it dis, min
+    return output
     
+    
+# def cd_penalty_annotated(batch, model1, start, stop, scores):
+    # # get index where annotation present:
+    # idx_nonzero = (start != -1).nonzero()[:,0]
+    # model_output = cd_text_irreg_scores(batch.text[:, idx_nonzero], model1, start[ idx_nonzero], stop[idx_nonzero])[0] 
+    # correct_idx = (batch.label[ idx_nonzero], torch.arange(batch.label[ idx_nonzero].shape[0]) )       
+    # model_softmax = torch.nn.functional.softmax(model_output, dim =0)[correct_idx]
+    # output = -(torch.log(model_softmax)*scores[ idx_nonzero].float()).mean() -(torch.log(model_softmax)*(1- scores[ idx_nonzero]).float() ).mean() #next thing to try
+    # print(output, torch.log(model_softmax).mean())
+    # return output
+    
+# def cd_penalty_annotated(batch, model1, start,  stop, agrees):
+    # model1_output = cd_text_irreg_scores(batch.text, model1, start, stop)
+    # correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class  
+    # model1_softmax = softmax_out((model1_output[0][0],model1_output[0][1]))[correct_idx]
+    # output = -(torch.log(model1_softmax) * agrees.float()).mean() #+ (torch.log(model1_softmax) * (1-agrees).float()).mean()
+    # return output
 
     
 def cd_penalty_for_one_decoy_all(batch, model1, start, stop):
-
-    model1_output = cd_text_irreg_scores(batch, model1, start, stop)
-    correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
-    model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx]))
+    mask_exists =(start!=-1).byte().cuda()
     
-    output = -(torch.log(model1_softmax[:,1])).mean() 
-    return output
+    if mask_exists.any():
+        model1_output = cd_text_irreg_scores(batch.text, model1, start, stop)
+        correct_idx = (batch.label, torch.arange(batch.label.shape[0]))  # only use the correct class
+        wrong_idx = (1-batch.label, torch.arange(batch.label.shape[0]))
+        model1_softmax = softmax_out((model1_output[0][correct_idx],model1_output[1][correct_idx])) #+ softmax_out((model1_output[0][wrong_idx],model1_output[1][wrong_idx]))
+   
+        output = (torch.log(model1_softmax[:,1])).masked_select(mask_exists)
+        return -output.mean()
+    else:
+        
+        return torch.zeros(1).cuda()
+        
 
 def cd_penalty(batch, model1, model2, start, stop):
    
@@ -446,8 +466,6 @@ def cd_penalty(batch, model1, model2, start, stop):
     model2_output = cd_batch_text(batch, model2, start, stop)
     model1_softmax = softmax_out(model1_output)
     model2_softmax = softmax_out(model2_output)
-    
-
     return ((model1_softmax-model2_softmax)*(torch.log(model1_softmax) - torch.log(model2_softmax))).sum(dim=1).reshape((2,-1)).sum(dim=0)
         
     

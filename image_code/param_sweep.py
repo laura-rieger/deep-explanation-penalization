@@ -5,13 +5,13 @@ import os
 
 # sweep different ways to initialize weights
 params_to_vary = {
-    'regularizer_rate': [0,0.1, 1, 10]
+    
+    'seed': [x+42 for x in range(3)],
+    
+    'regularizer_rate': [0, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0,]
 }
-#CUDA_DEVICE=0
-#os.environ["CUDA_VISIBLE_DEVICES"]=CUDA_DEVICE
-# run
-#s = Slurm("sweep_full", {"partition": partition, "time": "3-0"})
-ks = sorted(params_to_vary.keys())
+
+ks = [x for x in params_to_vary.keys()]
 vals = [params_to_vary[k] for k in ks]
 param_combinations = list(itertools.product(*vals)) # list of tuples
 print(param_combinations)
@@ -20,12 +20,11 @@ print(param_combinations)
 
 # iterate
 import os
-for j in range(10):
-    for i in range(len(param_combinations)):
-        param_str = 'python train_mnist.py '
-        for j, key in enumerate(ks):
-            param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
-        #s.run(param_str)
-        print(param_str)
-        os.system(param_str)
-        
+
+for i in range(len(param_combinations)):
+    param_str = 'python train_mnist.py '
+    for j, key in enumerate(ks):
+        param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
+    #s.run(param_str)
+    print(param_str)
+    os.system(param_str)

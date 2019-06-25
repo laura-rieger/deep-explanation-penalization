@@ -18,12 +18,12 @@ import random
 import pickle as pkl 
 def get_args():
     parser = ArgumentParser(description='PyTorch/torchtext SST')
-    parser.add_argument('--batch_size', type=int, default=50)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '../data/.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
     parser.add_argument('--dataset_path', type=str, default='../data')
-    parser.add_argument('--signal_strength', type=float, default=10.0)
+    parser.add_argument('--signal_strength', type=float, default=0.0)
     parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
     parser.add_argument('--n_layers', type=int, default=1)
     parser.add_argument('--which_adversarial', type=str, default='decoy')
@@ -57,13 +57,15 @@ dataset_path = args.dataset_path
 from params_fit import p # get parameters
 from params_save import S # class to save objects
 p.which_adversarial = args.which_adversarial
-
+p.out_dir = '../models/Decoy_models/' 
+p.num_iters = 10
 p.signal_strength = args.signal_strength
 
 decoy_strength = args.decoy_strength
 
 seed(p)
 s = S(p)
+
 out_name = str(args.which_adversarial) + p._str(p)
 use_individual = True # XXX
 torch.cuda.set_device(args.gpu)
@@ -164,8 +166,12 @@ for epoch in range(p.num_iters):
 
      
             start = ((batch.text ==class_decoy[0]) + (batch.text == class_decoy[1])).argmax(dim = 0)
+            start[((batch.text ==class_decoy[0]) + (batch.text == class_decoy[1])).sum(dim=0) ==0] = -1 # if there is none, set to -1
+            
+            
             stop = start +1
             #print(start)
+            
             
             cd_loss = cd.cd_penalty_for_one_decoy_all(batch, model, start, stop) 
             #print(cd_loss.data.item()/ total_loss.data.item())

@@ -5,9 +5,9 @@ import os
 
 # sweep different ways to initialize weights
 params_to_vary = {
-    'signal_strength': [1.0, 10.0],
-    'train_both': [1,0],
-    'sparse_signal': [1]
+#[100*(x) for x in range(10)]  +
+    'signal_strength': [0,100, 200, 300, 400, 500]  ,
+    'seed': [x for x in range(5)],
 }
 #CUDA_DEVICE=0
 #os.environ["CUDA_VISIBLE_DEVICES"]=CUDA_DEVICE
@@ -24,7 +24,7 @@ print(param_combinations)
 import os
 
 for i in range(len(param_combinations)):
-    param_str = 'python train.py '
+    param_str = 'python train_biased_gender.py '
     for j, key in enumerate(ks):
         param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
     #s.run(param_str)

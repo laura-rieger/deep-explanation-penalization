@@ -5,7 +5,7 @@ import os
 
 # sweep different ways to initialize weights= 
 params_to_vary = {
-    'signal_strength':   [100*(x) for x in range(10)]    ,
+    'signal_strength':   [1, 10, 50, ]    ,
     'decoy_strength' : [ 100.0,]
 }
 
@@ -20,7 +20,7 @@ print(param_combinations)
 import os
 
 for i in range(len(param_combinations)):
-    param_str = 'python train_with_adversarial.py '
+    param_str = 'python train_with_decoy.py '
     for j, key in enumerate(ks):
         param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
     #s.run(param_str)
