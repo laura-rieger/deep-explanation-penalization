@@ -116,3 +116,16 @@ results/
 
 old_results/
 **.pt
+code/isic_code/check_imgs.py
+code/isic_code/check_prop_ruler.py
+code/isic_code/download_imgs.py
+code/isic_code/download_meta.py
+code/isic_code/downsize_img.py
+code/isic_code/filter_malignant.py
+code/isic_code/ISIC challenge - distribute data.ipynb
+code/isic_code/ISIC Check.ipynb
+code/isic_code/isic_api.py
+code/isic_code/sort_imgs.py
+code/isic_code/Tee.png
+code/isic_code/Untitled.ipynb
+code/isic_code/untitled2.py
