@@ -108,7 +108,11 @@ models/trained_models
 acd
 **_cache
 **.pkl
+
 results/
 *.jpg
 *.csv
 *.tar
+
+old_results/
+**.pt

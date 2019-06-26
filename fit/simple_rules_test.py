@@ -5,7 +5,7 @@ import sys, time
 sys.path.insert(1, oj(sys.path[0], '..'))  # insert parent path
 sys.path.append('../fit')
 from numpy.random import randint
-from cd import cd_batch_text, softmax_out, cd_penalty_for_one
+from cd import cd_batch_text, softmax_out, cd_penalty_for_one_toy
 import time
 import torch
 import torch.nn as nn
@@ -27,6 +27,7 @@ import torch
 import pickle
 from tqdm import tqdm
 import string
+from random import shuffle
 
 torch.cuda.set_device(0)
 
@@ -34,19 +35,19 @@ torch.cuda.set_device(0)
  
 repeats = 1
 num_epochs = 200
-loss_weight_list = [0, 0.1] 
+loss_weight_list = [0,.1, 1] 
    
 char_class = ['a', 'b']
 
 num_noise_chars = 30
 char_noise = [x for x in string.ascii_lowercase[2:num_noise_chars+2]]
 dataset_path = "../data"
-max_length_list = [10,25, 50]
-noise_levels = [0,.2]
-num_in_train_list = [ 20,50]
+max_length_list = [10, 15, 20]
+noise_levels = [0.0, .2, .5]
+num_in_train_list = [20, 50]
 learning_rate = 0.001
 num_neurons = 128
- 
+     
 def make_dataset(num, noise = 0.0):
     dataset_list=[]
     has_noise = np.random.uniform(size = num) < noise
@@ -61,6 +62,8 @@ def make_dataset(num, noise = 0.0):
         my_input[np.random.randint(max_length)] = char_class[my_output]
 
         dataset_list.append([' '.join(my_input),  my_output ])
+        shuffle(dataset_list)
+    
     return dataset_list
 def write_dataset(file_path, file_name,num,add_noise =0):
     my_dataset = make_dataset(num, noise =add_noise)
@@ -96,9 +99,8 @@ for max_length in tqdm(max_length_list):
             this_batch_size = int(num_in_train/5) #XXX
             train_iter, dev_iter, test_iter = data.BucketIterator.splits(
                 (train, dev, test), batch_size=this_batch_size, device=torch.device(0),
+                shuffle = True,sort_within_batch=True, sort = False, 
                 sort_key=lambda x: len(x.text), # the BucketIterator needs to be told what function it should use to group the data.
-                         sort_within_batch=False,
-                shuffle =True,
                          repeat=False) # we pass repeat=False because we want to wrap this Iterator layer.,)
             TEXT.build_vocab(train, dev, test)
 
@@ -171,7 +173,7 @@ for max_length in tqdm(max_length_list):
                                 batch_length = batch.text.shape[0]
                                 start = np.random.randint(batch_length-1)
                                 stop =  start+np.random.randint(batch_length-start)
-                                loss_cd = cd_penalty_for_one(batch, model, start, stop, class_rules)
+                                loss_cd = cd_penalty_for_one_toy(batch, model, start, stop, class_rules)
                                 loss_net = loss_target + loss_weight * loss_cd
                             else:
                                 loss_cd =torch.zeros(1)
@@ -215,7 +217,7 @@ for max_length in tqdm(max_length_list):
                 result_dict["string_length"] =max_length
                 result_dict["learning_rate"]=learning_rate
                 result_dict["num_noise_chars"] = num_noise_chars 
-                
+       
                 result_dict["num_neurons"]=num_neurons
                 
                 result_dict["num_in_train" ] = num_in_train
@@ -224,6 +226,6 @@ for max_length in tqdm(max_length_list):
                 pid = ''.join(["%s" % randint(0, 9) for num in range(0, 20)])
                 result_dict['pid']=pid
 
-                pickle.dump( result_dict, open(oj("../results", str(pid) + ".pckl") , 'wb'))
+                pickle.dump( result_dict, open(oj("../results", str(pid) + "    .pckl") , 'wb'))
                 
 

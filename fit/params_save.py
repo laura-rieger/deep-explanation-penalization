@@ -12,6 +12,8 @@ class S:
         self.model_weights = None
         self.comp_model_weights = None
         self.explanation_divergence = np.zeros(p.num_iters)
+        self.decoy_strength = 0
+        self.use_individual = True
     
     # dictionary of everything but weights
     def _dict(self):
