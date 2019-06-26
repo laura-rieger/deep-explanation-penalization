@@ -15,21 +15,47 @@ from torch.optim import lr_scheduler
 import os
 import torch
 import torchvision
+import argparse
 import torchvision.datasets as datasets
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.utils.data as utils
 from torch import nn
+from numpy.random import randint
 import torchvision.models as models
 import time
 import os
 import copy
 from tqdm import tqdm
 
+# Training settings
+parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+parser.add_argument('--batch-size', type=int, default=16, metavar='N',
+                    help='input batch size for training (default: 64)')
+parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
+                    help='input batch size for testing (default: 1000)')
+parser.add_argument('--epochs', type=int, default=10, metavar='N',
+                    help='number of epochs to train (default: 10)')
+parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
+                    help='learning rate (default: 0.01)')
+parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
+                    help='SGD momentum (default: 0.5)')
+parser.add_argument('--no-cuda', action='store_true', default=False,
+                    help='disables CUDA training')
+parser.add_argument('--seed', type=int, default=42, metavar='S',
+                    help='random seed (default: 1)')
+parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+                    help='how many batches to wait before logging training status')
+parser.add_argument('--last_layer_only', action='store_false', default=True,
+                    help='disables CUDA training')
 
-feature_extract = True # only 
-num_epochs = 10
+args = parser.parse_args()
+
+
+
+feature_extract = args.last_layer_only # only 
+num_epochs = args.epochs
 
 device = torch.device(0)
 
@@ -57,11 +83,25 @@ num_val = int(0.1 * num_total)
 num_test = num_total - num_train - num_val
 torch.manual_seed(0);
 train_dataset, test_dataset, val_dataset= torch.utils.data.random_split(img_dataset, [num_train, num_test, num_val])
-datasets = {'train' : train_dataset, 'test':test_dataset, 'val': val_dataset}
-dataset_sizes = {'train' : len(train_dataset), 'test':len(test_dataset), 'val': len(val_dataset)}
 
 
-not_cancer_ratio = np.asarray(train_dataset.dataset.targets).mean() 
+# get filtered indices
+img_list =img_dataset.imgs
+file_names = [x[0] for x in img_list]
+start_patch_ind = file_names.index('../../../datasets/ISIC/not_cancer/ISIC_0000557.jpg')
+end_patch_ind = file_names.index('../../../datasets/ISIC/not_cancer/ISIC_0009867.jpg')
+patch_indice = np.arange(start_patch_ind,end_patch_ind+1)
+start_ruler_ind = file_names.index('../../../datasets/ISIC/cancer/ISIC_0012099.jpg')
+end_ruler_ind = file_names.index('../../../datasets/ISIC/cancer/ISIC_0014559.jpg')
+ruler_indice = np.arange(start_ruler_ind,end_ruler_ind+1)
+filter_idx = np.concatenate((patch_indice, ruler_indice))
+train_filtered = Subset(img_dataset, list(filter(lambda x: x in filter_idx, train_dataset.indices)) )
+
+datasets = {'train' : train_filtered, 'test':test_dataset, 'val': val_dataset}
+dataset_sizes = {'train' : len(train_filtered), 'test':len(test_dataset), 'val': len(val_dataset)}
+torch.manual.seed(args.seed)
+
+not_cancer_ratio = np.asarray(train_filtered.dataset.targets).mean() 
 cancer_ratio = 1- not_cancer_ratio
 cancer_weight = 1/cancer_ratio
 not_cancer_weight = 1/ not_cancer_ratio
@@ -176,6 +216,7 @@ criterion = nn.CrossEntropyLoss(weight = weights.double().float())
 optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 
 model, hist = train_model(model, dataloaders, criterion, optimizer_ft, num_epochs=num_epochs)
-torch.save(model.state_dict(),oj(".", "cancer_prim.pt"))
+pid = ''.join(["%s" % randint(0, 9) for num in range(0, 20)])
+torch.save(model.state_dict(),oj("../models", pid + ".pt"))
 import pickle as pkl
-pkl.dump(hist, open(os.path.join('.' , "prim_hist" + '.pkl'), 'wb'))
+pkl.dump(hist, open(os.path.join('../models' , pid + '.pkl'), 'wb'))
