@@ -11,6 +11,7 @@ class S:
                     
         self.cd = np.zeros(num_epochs)    # testing acc curve (should be plotted against p.its)
         self.model_weights = None
+        
         self.regularizer_rate = 0
         self.blocks = True
 
