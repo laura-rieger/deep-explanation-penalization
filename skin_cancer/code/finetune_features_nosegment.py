@@ -40,9 +40,9 @@ parser.add_argument('--batch_size', type=int, default=16, metavar='N',
 
 parser.add_argument('--epochs', type=int, default=5, metavar='N',
                     help='number of epochs to train (default: 10)')
-parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
-parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
+parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.5)')
 parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='random seed (default: 1)')
@@ -250,4 +250,9 @@ hist_dict['regularizer_rate'] = -1
 hist_dict['seed'] = args.seed
 hist_dict['batch_size'] = args.batch_size
 hist_dict['momentum'] = args.momentum
+
+hist_dict['learning_rate'] = args.lr
+
+
+
 pkl.dump(hist_dict, open(os.path.join('../feature_models' , pid +  '.pkl'), 'wb'))

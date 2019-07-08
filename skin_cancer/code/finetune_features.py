@@ -250,5 +250,7 @@ import pickle as pkl
 hist_dict['pid'] = pid
 hist_dict['regularizer_rate'] = regularizer_rate
 hist_dict['seed'] = args.seed
+hist_dict['batch_size'] = args.batch_size
 hist_dict['learning_rate'] = args.lr
+hist_dict['momentum'] = args.momentum
 pkl.dump(hist_dict, open(os.path.join('../feature_models' , pid +  '.pkl'), 'wb'))

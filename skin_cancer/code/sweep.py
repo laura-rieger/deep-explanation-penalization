@@ -5,12 +5,9 @@ import os
 
 # sweep different ways to initialize weights= 
 params_to_vary = {
-    'regularizer_rate':   [0, 10,  ]    ,
+    'regularizer_rate':   [0,1, 3, 10, 30]    ,
      'seed':   [42,   ]    ,
-     'lr':   [0.01, 0.1,  ]    ,
-      'momentum':   [0.5, 0.9, ]    ,
-     
-     'batch_size':   [16, 32, ]    ,
+
 }
 
 ks = sorted(params_to_vary.keys())
