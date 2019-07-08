@@ -5,7 +5,8 @@ from copy import deepcopy
 from torch import sigmoid 
 from torch import tanh
 import numpy as np
-# propagate a three-part
+# propagate a   three-part
+stabilizing_constant = 10e-20
 def propagate_three(a, b, c, activation):
     a_contrib = 0.5 * (activation(a + c) - activation(c) + activation(a + b + c) - activation(b + c))
     b_contrib = 0.5 * (activation(b + c) - activation(c) + activation(a + b + c) - activation(a + c))
@@ -26,10 +27,17 @@ def propagate_conv_linear(relevant, irrelevant, module, device='cuda'):
     # elementwise proportional
     prop_rel = torch.abs(rel)
     prop_irrel = torch.abs(irrel)
-    prop_sum = prop_rel + prop_irrel
+    prop_sum = prop_rel + prop_irrel +stabilizing_constant
+    
     prop_rel = torch.div(prop_rel, prop_sum)
     prop_irrel = torch.div(prop_irrel, prop_sum)
     return rel + torch.mul(prop_rel, bias), irrel + torch.mul(prop_irrel, bias)
+    
+    
+def propagate_AdaptiveAvgPool2d(relevant, irrelevant, module,  device='cuda'):
+    rel = module(relevant)
+    irrel = module(irrelevant)
+    return rel, irrel
 
 
 # propagate ReLu nonlinearity
@@ -86,6 +94,7 @@ def propagate_dropout(relevant, irrelevant, dropout):
 
 # get contextual decomposition scores for blob
 def cd(blob, im_torch, model, model_type='mnist', device='cuda'):
+ 
     # set up model
     model.eval()
     im_torch = im_torch.to(device)
@@ -94,27 +103,35 @@ def cd(blob, im_torch, model, model_type='mnist', device='cuda'):
     blob = torch.FloatTensor(blob).to(device)
     relevant = blob * im_torch
     irrelevant = (1 - blob) * im_torch
+  
 
     if model_type == 'mnist':
         scores = []
         mods = list(model.modules())[1:]
         relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[0])
+ 
+     
+
         relevant, irrelevant = propagate_pooling(relevant, irrelevant,
                                                  lambda x: F.max_pool2d(x, 2, return_indices=True), model_type='mnist')
         relevant, irrelevant = propagate_relu(relevant, irrelevant, F.relu)
 
         relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[1])
+
         relevant, irrelevant = propagate_pooling(relevant, irrelevant,
                                                  lambda x: F.max_pool2d(x, 2, return_indices=True), model_type='mnist')
+ 
         relevant, irrelevant = propagate_relu(relevant, irrelevant, F.relu)
+     
+        relevant = relevant.view(-1, 800)
+        irrelevant = irrelevant.view(-1, 800)
+ 
 
-        relevant = relevant.view(-1, 320)
-        irrelevant = irrelevant.view(-1, 320)
-
+        relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[2])
+    
+        relevant, irrelevant = propagate_relu(relevant, irrelevant, F.relu) 
         relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[3])
-        relevant, irrelevant = propagate_relu(relevant, irrelevant, F.relu)
-
-        relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[4])
+    
 
     else:
         mods = list(model.modules())
@@ -471,7 +488,7 @@ def cd_penalty(batch, model1, model2, start, stop):
     
 # this implementation of cd is very long so that we can view CD at intermediate layers
 # in reality, this should be a loop which uses the above functions
-def cd_track_vgg(blob, im_torch, model, model_type='vgg'):
+def cd_vgg_features(blob,im_torch, model, model_type='vgg'):
     # set up model
     model.eval()
 
@@ -481,17 +498,14 @@ def cd_track_vgg(blob, im_torch, model, model_type='vgg'):
     irrelevant = (1 - blob) * im_torch
 
     mods = list(model.modules())[2:]
-    scores = []
     #         (0): Conv2d (3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
     #         (1): ReLU(inplace)
     #         (2): Conv2d (64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
     #         (3): ReLU(inplace)
     #         (4): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[0])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[1])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[2])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[3])
     relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[4], model_type=model_type)
 
@@ -501,10 +515,8 @@ def cd_track_vgg(blob, im_torch, model, model_type='vgg'):
     #         (8): ReLU(inplace)
     #         (9): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[5])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[6])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[7])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[8])
     relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[9], model_type=model_type)
 
@@ -516,31 +528,17 @@ def cd_track_vgg(blob, im_torch, model, model_type='vgg'):
     #         (15): ReLU(inplace)
     #         (16): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[10])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[11])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[12])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[13])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[14])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[15])
     relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[16], model_type=model_type)
-    #         scores.append((relevant.clone(), irrelevant.clone()))
-    #         (17): Conv2d (256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    #         (18): ReLU(inplace)
-    #         (19): Conv2d (512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    #         (20): ReLU(inplace)
-    #         (21): Conv2d (512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-    #         (22): ReLU(inplace)
-    #         (23): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[17])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[18])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[19])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[20])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[21])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[22])
     relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[23], model_type=model_type)
     #         scores.append((relevant.clone(), irrelevant.clone()))
@@ -552,19 +550,118 @@ def cd_track_vgg(blob, im_torch, model, model_type='vgg'):
     #         (29): ReLU(inplace)
     #         (30): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[24])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[25])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[26])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[27])
     relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[28])
-    scores.append((relevant.clone(), irrelevant.clone()))
     relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[29])
     relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[30], model_type=model_type)
+    
+    relevant, irrelevant = propagate_AdaptiveAvgPool2d(relevant, irrelevant, mods[31])
+    
     #         scores.append((relevant.clone(), irrelevant.clone()))
+    # return relevant, irrelevant
 
     relevant = relevant.view(relevant.size(0), -1)
     irrelevant = irrelevant.view(irrelevant.size(0), -1)
+    return relevant, irrelevant
+
+
+def cd_vgg_classifier(relevant, irrelevant, im_torch, model, model_type='vgg'):
+    # set up model
+
+    model.eval()
+    mods = list(model.modules())[1:]
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[0])
+    # print(relevant.shape)
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[1])
+    relevant, irrelevant = propagate_dropout(relevant, irrelevant, mods[2])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[3])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[4])
+    relevant, irrelevant = propagate_dropout(relevant, irrelevant, mods[5])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[6])
+    # only interested in not cancer, which is class 0
+    #model.train()
+    
+    return relevant, irrelevant
+    
+def cd_track_vgg(blob, im_torch, model, model_type='vgg'):
+    # set up model
+    model.eval()
+
+    # set up blobs
+    blob = torch.cuda.FloatTensor(blob)
+    relevant = blob * im_torch
+    irrelevant = (1 - blob) * im_torch
+
+    mods = list(model.modules())[2:]
+    #         (0): Conv2d (3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (1): ReLU(inplace)
+    #         (2): Conv2d (64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (3): ReLU(inplace)
+    #         (4): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[0])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[1])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[2])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[3])
+    relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[4], model_type=model_type)
+
+    #         (5): Conv2d (64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (6): ReLU(inplace)
+    #         (7): Conv2d (128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (8): ReLU(inplace)
+    #         (9): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[5])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[6])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[7])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[8])
+    relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[9], model_type=model_type)
+
+    #         (10): Conv2d (128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (11): ReLU(inplace)
+    #         (12): Conv2d (256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (13): ReLU(inplace)
+    #         (14): Conv2d (256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (15): ReLU(inplace)
+    #         (16): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[10])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[11])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[12])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[13])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[14])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[15])
+    relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[16], model_type=model_type)
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[17])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[18])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[19])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[20])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[21])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[22])
+    relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[23], model_type=model_type)
+    #         scores.append((relevant.clone(), irrelevant.clone()))
+    #         (24): Conv2d (512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (25): ReLU(inplace)
+    #         (26): Conv2d (512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (27): ReLU(inplace)
+    #         (28): Conv2d (512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    #         (29): ReLU(inplace)
+    #         (30): MaxPool2d(kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1))
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[24])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[25])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[26])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[27])
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[28])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[29])
+    relevant, irrelevant = propagate_pooling(relevant, irrelevant, mods[30], model_type=model_type)
+    
+    relevant, irrelevant = propagate_AdaptiveAvgPool2d(relevant, irrelevant, mods[31])
+    
+    #         scores.append((relevant.clone(), irrelevant.clone()))
+    # return relevant, irrelevant
+
+    relevant = relevant.view(relevant.size(0), -1)
+    irrelevant = irrelevant.view(irrelevant.size(0), -1)
+    
 
     #       (classifier): Sequential(
     #         (0): Linear(in_features=25088, out_features=4096)
@@ -574,12 +671,18 @@ def cd_track_vgg(blob, im_torch, model, model_type='vgg'):
     #         (4): ReLU(inplace)
     #         (5): Dropout(p=0.5)
     #         (6): Linear(in_features=4096, out_features=1000)
-    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[32])
-    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[33])
-    relevant, irrelevant = propagate_dropout(relevant, irrelevant, mods[34])
-    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[35])
-    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[36])
-    relevant, irrelevant = propagate_dropout(relevant, irrelevant, mods[37])
-    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[38])
 
-    return relevant, irrelevant, scores
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[33])
+    # print(relevant.shape)
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[34])
+    
+    relevant, irrelevant = propagate_dropout(relevant, irrelevant, mods[35])
+    
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[36])
+    relevant, irrelevant = propagate_relu(relevant, irrelevant, mods[37])
+    
+    relevant, irrelevant = propagate_dropout(relevant, irrelevant, mods[38])
+    
+    relevant, irrelevant = propagate_conv_linear(relevant, irrelevant, mods[39])
+
+    return relevant, irrelevant

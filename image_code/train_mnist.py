@@ -14,8 +14,9 @@ import sys
 import pickle as pkl
 from copy import deepcopy
 from params_save import S # class to save objects
-sys.path.append('../../acd//acd/scores')
+sys.path.append('../fit')
 import cd
+#XXX changed here without trying if fix
 model_path = "../img_models"
 
 def save(p,  out_name):
