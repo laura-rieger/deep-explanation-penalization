@@ -24,17 +24,24 @@ import torchvision.models as models
 from torch import nn    
 from torch.nn import AdaptiveAvgPool2d
 
+
+
+# used for converting to the range VGG16 is used to
 mean = np.asarray([0.485, 0.456, 0.406])
 std = np.asarray([0.229, 0.224, 0.225])
 
 device = torch.device("cuda")
 
+#expects: datapath under ISIC with the following folder
+# raw_data/cancer - folder with all cancer images in JPG formart
+# raw_data/not_cancer -folder with all images of benign lesions in JOG
+# segmentation - folder with segmentations of all images that have patches in the image - name should be the same as the corresponding image
+
+# saves the calculated features under ISIC_features
+
 data_path = "../../../../datasets"
 save_path = oj(data_path, "ISIC_features")
-# load the two imgs
-
 seg_path  = oj(data_path, "ISIC/segmentation")
-
 img_path = oj(data_path, "ISIC/raw_data/not_cancer")
 list_of_img_names = os.listdir(img_path)
 

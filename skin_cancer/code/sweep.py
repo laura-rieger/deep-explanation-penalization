@@ -5,8 +5,8 @@ import os
 
 # sweep different ways to initialize weights= 
 params_to_vary = {
-    'regularizer_rate':   [0,1, 3, 10, 30]    ,
-     'seed':   [42,   ]    ,
+    'regularizer_rate':   [0.1,1, 10,]    ,
+     'seed':   [42, 43]    , # I usually start out with 42 as a seed - for repeats, I added the other ones
 
 }
 
@@ -21,7 +21,7 @@ print(param_combinations)
 import os
 
 for i in range(len(param_combinations)):
-    param_str = 'python finetune_features.py '
+    param_str = 'python train_saliency.py '
     for j, key in enumerate(ks):
         param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
     #s.run(param_str)

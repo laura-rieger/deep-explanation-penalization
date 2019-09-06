@@ -16,7 +16,7 @@ def gradient_sum(im, target, seg ,  model, crit, device='cuda'):
 
     pred = model(im)
     loss = crit(pred, target)
-    grad_params = torch.abs(torch.autograd.grad(loss, im,create_graph = True, retain_graph = True)[0].sum(dim=1).masked_select(seg.byte())**2).sum()
+    grad_params = torch.abs(torch.autograd.grad(loss, im,create_graph = True)[0].sum(dim=1).masked_select(seg.byte())**2).sum()
     return grad_params
 
 
@@ -75,3 +75,30 @@ def ig_scores_2d(model, im_torch, num_classes=10, im_size=28, sweep_dim=1, ind=N
         output[:, class_to_explain] = ig_scores.flatten()
     return output
 
+def eg_scores_2d(model, imgs, img_idx,  targets, num_samples =100, num_classes=10, im_size=28, sweep_dim=1, ind=None, device='cuda'):
+    # for p in model.parameters():
+        # if p.grad is not None:
+            # p.grad.data.zero_()
+
+    uniform_dis = torch.distributions.uniform.Uniform(0,1)
+    criterion = torch.nn.L1Loss(size_average=False)
+    
+    idxs_random = np.random.choice(len(targets), size =num_samples)
+
+    
+    alpha =uniform_dis.sample(torch.Size([num_samples,])).cuda()
+    input_vecs = imgs[idxs_random] *(1-alpha[:, None, None, None]) + alpha[:, None, None, None]*imgs[img_idx]
+    input_vecs.requires_grad= True
+    out = F.softmax(model(input_vecs), dim = 1)[:, targets[img_idx]] #XXX
+
+    loss = criterion(out, torch.zeros(num_samples).to(device))
+
+
+    grad_params = torch.abs(torch.autograd.grad(loss, input_vecs,create_graph = True)[0])
+
+    imps = torch.abs(grad_params * (imgs[img_idx] - imgs[idxs_random] ))
+    return imps.sum(dim = 0).sum(dim=0)
+        
+        
+
+    

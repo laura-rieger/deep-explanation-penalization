@@ -5,7 +5,7 @@ import os
 
 # sweep different ways to initialize weights= 
 params_to_vary = {
-    'signal_strength':   [1, 10, 50, ]    ,
+    'signal_strength':   [0, 100, 200, 300 ]    ,
     'decoy_strength' : [ 100.0,]
 }
 
