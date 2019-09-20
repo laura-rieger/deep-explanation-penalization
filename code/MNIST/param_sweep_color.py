@@ -8,8 +8,8 @@ params_to_vary = {
     
     'seed': [x for x in range(6)],
     
-    'regularizer_rate': [ 5000,],
-    'grad_method': [0]
+    'regularizer_rate': [ 0.1, 1,500,1000,5000],
+    'grad_method': [2,]
 }
  
 ks = [x for x in params_to_vary.keys()]

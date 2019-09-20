@@ -172,6 +172,7 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
             elif args.grad_method ==2:
                 for j in range(len(data)):
                     for i in range(num_blobs): 
+
                         add_loss +=(eg_scores_2d(model, data, j, target, 50) * torch.FloatTensor(blobs[blob_idxs[i]]).to(device)).sum()
 
                 (regularizer_rate*add_loss).backward()
@@ -246,12 +247,12 @@ for epoch in range(1, args.epochs + 1):
             break
  
 s.dataset= "Color"      
-print("FF")
+
 test(args, model, device, val_loader, epoch+1)
 if args.grad_method ==0:
     s.method = "CDEP"
 elif args.grad_method ==2:
-    s.method = "ExpectedGrad"
+    s.method = "EGradients"
 else:
     s.method = "Grad"
 s.model_weights = best_model_weights
