@@ -6,10 +6,10 @@ import os
 # sweep different ways to initialize weights
 params_to_vary = {
     
-    'seed': [x for x in range(1)],
+    'seed': [x for x in range(3)],
     
-    'regularizer_rate': [0,1,],
-    'grad_method': [0,1 ,2],
+    'regularizer_rate': [0,0.1, 1.0, 10.0 , 100.0, 1000.0 , 100000],
+    'grad_method': [2],
     'epochs': [1,]
 }
  
