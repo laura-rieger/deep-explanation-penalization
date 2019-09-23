@@ -17,8 +17,8 @@ from params_save import S # class to save objects
 sys.path.append('../.')
 from score_funcs import gradient_sum,eg_scores_2d
 import cd
-#XXX changed here without trying if fix
-model_path = "../../models/MNIST"
+
+model_path = "../../models/ColorMNIST"
 
 def save(p,  out_name):
     # save final
@@ -94,8 +94,7 @@ s.regularizer_rate = regularizer_rate
 num_blobs = 8
 s.num_blobs = num_blobs
 s.seed = args.seed
-#regularizer_rate /=num_blobs
-#sys.exit()
+
 
 
 device = torch.device("cuda" if use_cuda else "cpu")
@@ -120,7 +119,7 @@ val_x_tensor = torch.Tensor(np.load(oj("../../data/ColorMNIST", "test_x.npy")))
 val_y_tensor = torch.Tensor(np.load(oj("../../data/ColorMNIST", "test_y.npy"))).type(torch.int64)
 val_dataset = utils.TensorDataset(val_x_tensor,val_y_tensor) # create your datset
 val_loader = utils.DataLoader(val_dataset,
-        batch_size=args.test_batch_size, shuffle=True, **kwargs) # create your dataloader
+        batch_size=args.test_batch_size, shuffle=True, **kwargs) 
 
 
 torch.manual_seed(args.seed)
@@ -141,7 +140,6 @@ prob = ((train_x_tensor).numpy().sum(axis = 1) !=-3).mean(axis = 0).reshape(-1)
 prob /=prob.sum()
 model = Net().to(device)
 
-# optimizer = optim.Adam(model.parameters(), weight_decay = 0.0001)
 optimizer = optim.Adam(model.parameters(), weight_decay = 0.001)
 
 def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate, until_batch = -1):
@@ -192,10 +190,6 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
         if batch_idx % args.log_interval == 0:
             pred = output.argmax(dim=1, keepdim=True)
             acc = 100.*pred.eq(target.view_as(pred)).sum().item()/len(target)
-            # print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}, Acc: ({:.0f}%), CD Loss: {:.6f}'.format(
-                # epoch, batch_idx * len(data), len(train_loader.dataset),
-                # 100. * batch_idx / len(train_loader), loss.item(),acc,   add_loss.item()))
-              
             s.losses_train.append(loss.item())
             s.accs_train.append(acc)
             s.cd.append(add_loss.item())
@@ -228,7 +222,6 @@ def test(args, model, device, test_loader, epoch):
 
 best_model_weights = None
 best_test_loss = 100000
-# train(args, model, device, train_loader, optimizer, 0, 0, until_batch = 3)
 patience = 2
 cur_patience = 0
 
@@ -259,6 +252,3 @@ s.model_weights = best_model_weights
 np.random.seed()
 pid = ''.join(["%s" % np.random.randint(0, 9) for num in range(0, 20)])
 save(s,  pid)
-# if (args.save_model):
-
-    # torch.save(model.state_dict(),oj(model_path, "color_mnist_cnn.pt"))

@@ -16,7 +16,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 ###############################################################################
-
+# copied from https://raw.githubusercontent.com/ImageMarkup/isic-archive/master/scripts/isic_api.py
 import requests
 
 

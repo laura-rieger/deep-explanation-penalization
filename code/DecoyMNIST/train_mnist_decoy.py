@@ -64,7 +64,7 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=20, metavar='N',
+parser.add_argument('--epochs', type=int, default=5, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
@@ -83,7 +83,7 @@ parser.add_argument('--grad_method', type=int, default=0, metavar='N',
 # parser.add_argument('--gradient_method', type=string, default="CD", metavar='N',
                     # help='what method is used')
 args = parser.parse_args()
-model_path = "../../models/MNIST_mem"
+model_path = "../../models/DecoyMNIST"
 s = S(args.epochs)
 use_cuda = not args.no_cuda and torch.cuda.is_available()
 regularizer_rate = args.regularizer_rate
@@ -162,13 +162,13 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
                 rel, irrel = cd.cd(blob, data,model)
                 add_loss += torch.nn.functional.softmax(torch.stack((rel.view(-1),irrel.view(-1)), dim =1), dim = 1)[:,0].mean()
 
-                print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
+                #print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
                 (regularizer_rate*add_loss +loss).backward()
             elif args.grad_method ==1:
                 add_loss +=gradient_sum(data, target, torch.FloatTensor(blob).to(device),  model, F.nll_loss)
                 (regularizer_rate*add_loss).backward()
 
-                print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
+                #print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
                 optimizer.step()
                 loss = F.nll_loss(output, target)
                 loss.backward()
@@ -178,7 +178,7 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
                     add_loss +=(eg_scores_2d(model, data, j, target, num_samples) * torch.FloatTensor(blob).to(device)).sum()
                 (regularizer_rate*add_loss).backward()
 
-                print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
+                #print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
                 optimizer.step()
                 loss = F.nll_loss(output, target)
      
@@ -187,7 +187,7 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
             add_loss = torch.zeros(1,)
             loss.backward()
 
-        print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
+        #print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
         optimizer.step()
         
         
@@ -260,7 +260,7 @@ print("FF")
 test(args, model, device, val_loader, epoch+1)
 s.dataset= "Decoy"
 if args.grad_method ==0:
-    s.method = "CD"
+    s.method = "CDEP"
 elif args.grad_method ==2:
     s.method = "ExpectedGrad"
 else:

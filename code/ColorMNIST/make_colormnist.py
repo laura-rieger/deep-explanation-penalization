@@ -21,7 +21,6 @@ color_x = np.zeros((num_samples, 3, 28, 28), dtype = np.float32)
 
 for i in tqdm(range(num_samples)):
     my_color  = colors[mnist_trainset.train_labels[i].item()]
-
     color_x[i ] = mnist_trainset.data[i].numpy().astype(np.float32)[np.newaxis]*my_color[:, None, None]
 color_y = mnist_trainset.train_labels.numpy().copy()
 
@@ -42,9 +41,8 @@ color_x = np.zeros((num_samples, 3, 28, 28), dtype = np.float32)
 
 color_y = mnist_trainset.train_labels.numpy().copy()
 for i in tqdm(range(num_samples)):
-
     color_x[i ] = mnist_trainset.data[i].numpy().astype(np.float32)[np.newaxis]*colors[9-color_y[i]] [:, None, None]
-#
+
 color_x -= mean[None, :, None, None,]
 color_x /= std[None, :, None, None,]
 

@@ -1,9 +1,10 @@
 from isic_api import ISICApi
 #Insert Username and Password Below
-api = ISICApi(username="lrieger", password="UKn7@7f31qUZ")
-#%%
+# The ISIC dataset is freely available for research use. You have to create a user on isic-archive.com
+api = ISICApi(username="<INSERT USERNAME>", password="<INSERT PASSWORD>")
+
 imageList = api.getJson('image?limit=100&offset=0&sort=name')
-#%%
+
 import urllib
 import os
 savePath = 'ISICArchive/'
