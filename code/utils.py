@@ -50,7 +50,10 @@ def get_output(model, dataset):
 def get_auc_f1(model, fname, dataset):
     with open(fname, 'rb') as f:
         weights = torch.load(f)
-    model.classifier.load_state_dict(weights)
+    if "classifier.0.weight" in weights.keys(): #for the gradient models we unfortunately saved all of the weights
+        model.load_state_dict(weights)
+    else:
+        model.classifier.load_state_dict(weights)
     y, y_hat = get_output(model.classifier, dataset)
     auc =roc_auc_score(y_hat, y)
     f1 = np.asarray([f1_score(y_hat, y > x) for x in np.linspace(0.1,1, num = 10) if (y >x).any() and (y<x).any()]).max()

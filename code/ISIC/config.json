@@ -1,1 +1,1 @@
-{"user": <INSERT USER NAME HERE>, "pw": <INSERT PW HERE>, "data_folder": "../../data/ISIC", "num_imgs":25000, "model_folder": "../../models/ISIC"}
+{"user": "INSERT USER NAME HERE", "pw": "INSERT PW HERE", "data_folder": "../../data/ISIC", "num_imgs":25000, "model_folder": "../../models/ISIC"}

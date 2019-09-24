@@ -15,7 +15,6 @@ vals = [params_to_vary[k] for k in ks]
 param_combinations = list(itertools.product(*vals)) # list of tuples
 print(param_combinations)
 
-import os
 
 for i in range(len(param_combinations)):
     param_str = 'python train_saliency.py '

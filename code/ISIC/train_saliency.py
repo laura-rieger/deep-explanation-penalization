@@ -38,11 +38,15 @@ with open('config.json') as json_file:
     data = json.load(json_file)
 model_path = os.path.join(data["model_folder"], "feature_models_gradient")
 data_path =data["data_folder"]
-data_path = "../../../../datasets"
+
 seg_path  = oj(data_path, "segmentation")
 not_cancer_path = oj(data_path, "processed/benign")
 cancer_path = oj(data_path, "processed/malignant")
  
+ 
+mean = np.asarray([0.485, 0.456, 0.406])
+std = np.asarray([0.229, 0.224, 0.225])
+
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch_size', type=int, default=16, metavar='N',
@@ -82,6 +86,7 @@ def load_folder(path):
         try:
             img = Image.open(oj(path, list_files[i]))
             imgs_np[i] = np.asarray(img)/255.0
+            
             img.close()
         except:
             print(i)
@@ -99,7 +104,11 @@ def load_seg(path, orig_path):
     return imgs_np
 
 cancer_set = load_folder(cancer_path)
+cancer_set -= mean[None, None, :]
+cancer_set /= std[None, None, :]
 not_cancer_set = load_folder(not_cancer_path)
+not_cancer_set -= mean[None, None, :]
+not_cancer_set /= std[None, None, :]
 seg_set = load_seg(seg_path, not_cancer_path)
 
 cancer_targets = np.ones((cancer_set.shape[0])).astype(np.int64)
@@ -207,10 +216,6 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
                     outputs = model(inputs)
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
-
-                    # backward + optimize only if in training phase
-                    if i %10 ==0:
-                        print(loss)
                     if phase == 'train':
                         (loss).backward()
                         optimizer.step()
