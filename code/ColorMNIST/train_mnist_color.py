@@ -100,8 +100,14 @@ s.seed = args.seed
 device = torch.device("cuda" if use_cuda else "cpu")
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+train_x_numpy = np.load(oj("../../data/ColorMNIST", "train_x.npy"))
 
-train_x_tensor = torch.Tensor(np.load(oj("../../data/ColorMNIST", "train_x.npy")))
+mean = train_x_numpy.mean(axis = (0,2,3))
+std = train_x_numpy.std(axis = (0,2,3)) 
+
+train_x_numpy -= mean[None, :, None, None,]
+train_x_numpy /= std[None, :, None, None,]
+train_x_tensor = torch.Tensor(train_x_numpy)
 train_y_tensor = torch.Tensor(np.load(oj("../../data/ColorMNIST", "train_y.npy"))).type(torch.int64)
 complete_dataset = utils.TensorDataset(train_x_tensor,train_y_tensor) # create your datset
 
@@ -115,7 +121,15 @@ train_loader = utils.DataLoader(train_dataset,
 test_loader = utils.DataLoader(test_dataset,
     batch_size=args.batch_size, shuffle=True, **kwargs) # create your dataloader
 
-val_x_tensor = torch.Tensor(np.load(oj("../../data/ColorMNIST", "test_x.npy")))
+val_x_numpy = np.load(oj("../../data/ColorMNIST", "test_x.npy"))
+
+
+
+val_x_numpy -= mean[None, :, None, None,]
+val_x_numpy /= std[None, :, None, None,]
+
+
+val_x_tensor = torch.Tensor(val_x_numpy)
 val_y_tensor = torch.Tensor(np.load(oj("../../data/ColorMNIST", "test_y.npy"))).type(torch.int64)
 val_dataset = utils.TensorDataset(val_x_tensor,val_y_tensor) # create your datset
 val_loader = utils.DataLoader(val_dataset,

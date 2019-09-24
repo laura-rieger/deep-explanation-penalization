@@ -5,8 +5,8 @@ import os
 
 # sweep different ways to initialize weights= 
 params_to_vary = {
-    'regularizer_rate':   [0.1,1, 10,]    ,
-     'seed':   [42, 43]    , # I usually start out with 42 as a seed - for repeats, I added the other ones
+    'regularizer_rate':   [1, 10, 100]    ,
+     'seed':   [x for x in range(3)]    , 
 
 }
 
@@ -14,10 +14,7 @@ ks = sorted(params_to_vary.keys())
 vals = [params_to_vary[k] for k in ks]
 param_combinations = list(itertools.product(*vals)) # list of tuples
 print(param_combinations)
-#for param_delete in params_to_delete:
-#    param_combinations.remove(param_delete)
 
-# iterate
 import os
 
 for i in range(len(param_combinations)):

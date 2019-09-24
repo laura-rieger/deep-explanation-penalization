@@ -1,18 +1,22 @@
 from isic_api import ISICApi
-#Insert Username and Password Below
-api = ISICApi(username="<INSERT USERNAME>", password="<INSERT PASSWORD>")
-
-import urllib
 import os
-
+import json
 import csv
-imageList = api.getJson('image?limit=106&offset=0&sort=name')
+with open('config.json') as json_file:
+    data = json.load(json_file)
 
-            
+api = ISICApi(username=data["user"], password=data["pw"])
+data_path = data["data_folder"]
+num_imgs = data["num_imgs"]
+if not os.path.exists(data_path):
+    os.makedirs(data_path)
+imageList = api.getJson('image?limit=' + str(num_imgs) +'&offset=0&sort=name')
+
+#%%            
 print('Fetching metadata for %s images' % len(imageList))
 imageDetails = []
 for image in imageList:
-    print(' ', image['name'])
+  
     # Fetch the full image details
     imageDetail = api.getJson('image/%s' % image['_id'])
     imageDetails.append(imageDetail)
@@ -27,8 +31,8 @@ metadataFields = set(
 
 metadataFields = ['isic_id'] + sorted(metadataFields)
 outputFileName = "meta"
-
-outputFilePath = os.path.join(".", outputFileName)
+#%%
+outputFilePath = os.path.join(data_path, outputFileName)
 # Write the metadata to a CSV
 print('Writing metadata to CSV: %s' % outputFileName+'.csv')
 with open(outputFilePath+'.csv', 'w') as outputStream:

@@ -1,11 +1,13 @@
+
+#original  from https://github.com/csinva/hierarchical-dnn-interpretations/blob/master/acd/scores/cd.py
 import torch
 import torch.nn.functional as F
 from copy import deepcopy
-#from scipy.special import expit as sigmoid
+
 from torch import sigmoid 
 from torch import tanh
 import numpy as np
-# propagate a   three-part
+
 stabilizing_constant = 10e-20
 def propagate_three(a, b, c, activation):
     a_contrib = 0.5 * (activation(a + c) - activation(c) + activation(a + b + c) - activation(b + c))

@@ -71,7 +71,6 @@ seed(p)
 s = S(p)
 
 out_name = str(args.which_adversarial) + p._str(p)
-use_individual = True # XXX
 torch.cuda.set_device(args.gpu)
 
 inputs = data.Field(lower=True)
@@ -81,7 +80,7 @@ train, dev, test = TabularDataset.splits(
                            path=dataset_path, # the root directory where the data lies
                            train='train_decoy_SST_' +str(decoy_strength)+'.csv', validation="dev_decoy_SST.csv", test = "test_decoy_SST.csv",
                            format='csv', 
-                           skip_header=False, # if your csv header has a header, make sure to pass this to ensure it doesn't get proceesed as data!
+                           skip_header=False,
                            fields=tv_datafields)
 
 inputs.build_vocab(train, dev, test)
@@ -122,7 +121,7 @@ criterion = nn.CrossEntropyLoss()
 
 
  
-opt = O.Adam(model.parameters())  # , lr=args.lr)
+opt = O.Adam(model.parameters())  
 
 # model.embed.requires_grad = False
 
@@ -144,12 +143,6 @@ for epoch in range(p.num_iters):
     n_correct, n_total, cd_loss_tot, train_loss_tot  = 0, 0, 0,0 
     
     for batch_idx, batch in tqdm(enumerate(train_iter)):
-#        if batch_idx >10:
-#            break
- 
-
-
-        # switch model to training mode, clear gradient accumulators
         model.train()
     
         opt.zero_grad()
@@ -174,7 +167,6 @@ for epoch in range(p.num_iters):
             
             
             stop = start +1
-            #print(start)
             
             
             cd_loss = cd.cd_penalty_for_one_decoy_all(batch, model, start, stop) 
@@ -213,7 +205,6 @@ for epoch in range(p.num_iters):
  
     s.accs_test[epoch] = dev_acc
     s.decoy_strength= decoy_strength
-    s.use_individual = use_individual
      
     s.losses_train[epoch] = total_loss.data.item()
     s.losses_test[epoch] = dev_loss.data #.item()

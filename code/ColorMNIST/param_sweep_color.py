@@ -8,7 +8,7 @@ params_to_vary = {
     
     'seed': [x for x in range(5)],
     
-    'regularizer_rate': [0, 0.1, 1,500,1000,5000],
+    'regularizer_rate': [0, 0.1, 1,10, 500,1000,5000],
     'grad_method': [0,1,2,]
 }
  

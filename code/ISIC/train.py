@@ -22,6 +22,9 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.utils.data as utils
+
+from torch.utils.data import TensorDataset, ConcatDataset
+
 from torch import nn
 from numpy.random import randint
 import torchvision.models as models
@@ -29,8 +32,14 @@ import time
 import os
 import copy
 from tqdm import tqdm
-sys.path.append('../../fit/')
+sys.path.append('../')
 import cd
+import json
+
+with open('config.json') as json_file:
+    data = json.load(json_file)
+model_path = os.path.join(data["model_folder"], "feature_models")
+dataset_path =os.path.join(data["data_folder"],"calculated_features")
 
  
 # Training settings
@@ -63,11 +72,6 @@ model.classifier[-1] = nn.Linear(4096, 2)
 model = model.classifier.to(device)
 
 
-from torch.utils.data import TensorDataset, ConcatDataset
-
-
-dataset_path ="../../../../datasets/ISIC_features"
-from torch.utils.data import TensorDataset, ConcatDataset
 with open(oj(dataset_path, "cancer.npy"), 'rb') as f:
     cancer_featuress = np.load(f)
 with open(oj(dataset_path, "not_cancer.npy"), 'rb') as f:
@@ -179,9 +183,9 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
                                 cur_cd_loss = torch.nn.functional.softmax(torch.stack((rel[:,0].masked_select(mask),irrel[:,0].masked_select(mask)), dim =1), dim = 1)[:,0].mean() 
                                 cur_cd_loss +=torch.nn.functional.softmax(torch.stack((rel[:,1].masked_select(mask),irrel[:,1].masked_select(mask)), dim =1), dim = 1)[:,0].mean() 
                                 add_loss = cur_cd_loss/2
-                                print("FF")
+                                #print("FF")
                         (loss+regularizer_rate*add_loss).backward()
-                        print(torch.cuda.memory_allocated()/(np.power(10,9)))
+                        #print(torch.cuda.memory_allocated()/(np.power(10,9)))
                         optimizer.step()
 
                 # statistics
@@ -243,11 +247,11 @@ criterion = nn.CrossEntropyLoss(weight = weights.double().float())
 
 
 #sys.exit()
-optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
-
+#optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
+optimizer_ft = optim.Adam(params_to_update, weight_decay = 0.001)
 model, hist_dict = train_model(model, dataloaders, criterion, optimizer_ft, num_epochs=num_epochs)
 pid = ''.join(["%s" % randint(0, 9) for num in range(0, 20)])
-#torch.save(model.state_dict(),oj("../feature_models", pid + ".pt"))
+torch.save(model.state_dict(),oj(model_path, pid + ".pt"))
 import pickle as pkl
 hist_dict['pid'] = pid
 hist_dict['regularizer_rate'] = regularizer_rate
@@ -255,4 +259,4 @@ hist_dict['seed'] = args.seed
 hist_dict['batch_size'] = args.batch_size
 hist_dict['learning_rate'] = args.lr
 hist_dict['momentum'] = args.momentum
-#pkl.dump(hist_dict, open(os.path.join('../feature_models' , pid +  '.pkl'), 'wb'))
+pkl.dump(hist_dict, open(os.path.join(model_path , pid +  '.pkl'), 'wb'))

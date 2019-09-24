@@ -143,9 +143,7 @@ for epoch in range(p.num_iters):
     n_correct, n_total, cd_loss_tot, train_loss_tot  = 0, 0, 0,0 
     
     for batch_idx, batch in tqdm(enumerate(train_iter)):
-#        if batch_idx >10:
-#            break
- 
+
 
 
         # switch model to training mode, clear gradient accumulators
@@ -166,30 +164,19 @@ for epoch in range(p.num_iters):
         total_loss = criterion(answer, batch.label)
         train_loss_tot += total_loss.data.item()
         if p.signal_strength >0:
-
-     
             start = ((batch.text ==class_decoy[0]) + (batch.text == class_decoy[1])).argmax(dim = 0)
             start[((batch.text ==class_decoy[0]) + (batch.text == class_decoy[1])).sum(dim=0) ==0] = -1 # if there is none, set to -1
-            
-            
             stop = start +1
-            #print(start)
-            
-            
             cd_loss = cd.cd_penalty_for_one_decoy_all(batch, model, start, stop) 
-            #print(cd_loss.data.item()/ total_loss.data.item())
             total_loss = total_loss+ p.signal_strength*cd_loss
-           
         else: 
             cd_loss = torch.zeros(1)
-        #print(cd_loss.data)
         cd_loss_tot +=cd_loss.data.item()
         total_loss.backward()
         
         
         opt.step()
 
-    # switch model to evaluation mode
     model.eval()
     dev_iter.init_epoch()
 
@@ -215,7 +202,7 @@ for epoch in range(p.num_iters):
     s.use_individual = use_individual
      
     s.losses_train[epoch] = total_loss.data.item()
-    s.losses_test[epoch] = dev_loss.data #.item()
+    s.losses_test[epoch] = dev_loss.data 
     s.explanation_divergence[epoch] = deepcopy(cd_loss_tot / len(train))
     s.model_weights = deepcopy(model.state_dict())
     
