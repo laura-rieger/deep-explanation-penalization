@@ -109,12 +109,10 @@ acd
 **_cache
 **.pkl
 
-results/
 *.jpg
 *.csv
 *.tar
 
-old_results/
 **.pt
 code/isic_code/check_imgs.py
 code/isic_code/check_prop_ruler.py

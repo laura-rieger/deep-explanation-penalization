@@ -1,4 +1,4 @@
-Official code for using / reproducing CDEP from the paper "[Interpretations are useful: penalizing explanations to align neural networks with prior knowledge](https://openreview.net/pdf?id=SkEqro0ctQ)" (ICLR 2019). This code allows one to regularize interpretations (computed via contextual decomposition) to improve neural networks (trained in pytorch).
+Official code for using / reproducing CDEP from the paper "[Interpretations are useful: penalizing explanations to align neural networks with prior knowledge](https://openreview.net/pdf?id=SkEqro0ctQ)". This code allows one to regularize interpretations (computed via contextual decomposition) to improve neural networks (trained in pytorch).
 
 *Note: this repo is actively maintained. For any questions please file an issue.*
 
