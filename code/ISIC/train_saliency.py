@@ -40,8 +40,8 @@ model_path = os.path.join(data["model_folder"], "feature_models_gradient")
 data_path =data["data_folder"]
 
 seg_path  = oj(data_path, "segmentation")
-not_cancer_path = oj(data_path, "processed/benign")
-cancer_path = oj(data_path, "processed/malignant")
+not_cancer_path = oj(data_path, "processed/no_cancer")
+cancer_path = oj(data_path, "processed/cancer")
  
  
 mean = np.asarray([0.485, 0.456, 0.406])

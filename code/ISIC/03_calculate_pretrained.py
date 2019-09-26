@@ -29,8 +29,8 @@ with open('config.json') as json_file:
 
 data_path = data["data_folder"]
 processed_path = os.path.join(data_path, "processed")
-benign_path = os.path.join(processed_path, "benign")
-malignant_path = os.path.join(processed_path, "malignant")
+benign_path = os.path.join(processed_path, "no_cancer")
+malignant_path = os.path.join(processed_path, "cancer")
 feature_path = os.path.join(data_path, "calculated_features")
 segmentation_path = os.path.join(data_path, "segmentation")
 os.makedirs(feature_path,exist_ok = True)

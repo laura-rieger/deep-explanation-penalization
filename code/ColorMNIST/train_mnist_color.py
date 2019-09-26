@@ -9,17 +9,21 @@ from os.path import join as oj
 import torch.utils.data as utils
 from torchvision import datasets, transforms
 import numpy as np
+
 import os
 import sys
 import pickle as pkl
 from copy import deepcopy
 from params_save import S # class to save objects
 sys.path.append('../.')
-from score_funcs import gradient_sum,eg_scores_2d
+import score_funcs
+from score_funcs import gradient_sum,eg_scores_2d,cdep
 import cd
-
-model_path = "../../models/ColorMNIST"
-
+import random
+model_path = "../../models/ColorMNIST_test"
+import os
+os.makedirs(model_path, exist_ok= True)
+torch.backends.cudnn.deterministic = True #this makes results reproducible. 
 def save(p,  out_name):
     # save final
     os.makedirs(model_path, exist_ok=True)
@@ -64,7 +68,7 @@ class Net(nn.Module):
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+parser.add_argument('--batch-size', type=int, default=256, metavar='N',
                     help='input batch size for training (default: 64)')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
@@ -76,7 +80,7 @@ parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.5)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables CUDA training')
-parser.add_argument('--seed', type=int, default=42, metavar='S',
+parser.add_argument('--seed', type=int, default=0, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                     help='how many batches to wait before logging training status')
@@ -84,6 +88,7 @@ parser.add_argument('--regularizer_rate', type=float, default=0.0, metavar='N',
                     help='how heavy to regularize lower order interaction (AKA color)')
 parser.add_argument('--grad_method', type=int, default=0, metavar='N',
                     help='which gradient method is used - Grad or CD')
+
 # parser.add_argument('--gradient_method', type=string, default="CD", metavar='N',
                     # help='what method is used')
 args = parser.parse_args()
@@ -94,12 +99,12 @@ s.regularizer_rate = regularizer_rate
 num_blobs = 8
 s.num_blobs = num_blobs
 s.seed = args.seed
-
+print("FF")
 
 
 device = torch.device("cuda" if use_cuda else "cpu")
 
-kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+kwargs = {'num_workers': 0, 'pin_memory': True,  'worker_init_fn':np.random.seed(12)} if use_cuda else {}
 train_x_numpy = np.load(oj("../../data/ColorMNIST", "train_x.npy"))
 
 mean = train_x_numpy.mean(axis = (0,2,3))
@@ -122,9 +127,6 @@ test_loader = utils.DataLoader(test_dataset,
     batch_size=args.batch_size, shuffle=True, **kwargs) # create your dataloader
 
 val_x_numpy = np.load(oj("../../data/ColorMNIST", "test_x.npy"))
-
-
-
 val_x_numpy -= mean[None, :, None, None,]
 val_x_numpy /= std[None, :, None, None,]
 
@@ -136,10 +138,10 @@ val_loader = utils.DataLoader(val_dataset,
         batch_size=args.test_batch_size, shuffle=True, **kwargs) 
 
 
-torch.manual_seed(args.seed)
+torch.manual_seed(args.seed) #weight init is varied
 torch.cuda.manual_seed(args.seed)
 np.random.seed(args.seed)
-
+random.seed(args.seed)
 
 # make the sampling thing
 
@@ -172,20 +174,18 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
             blob_idxs = np.random.choice(28*28, size = num_blobs, p = prob)
             if args.grad_method ==0:
                 for i in range(num_blobs): 
-                    rel, irrel = cd.cd(blobs[blob_idxs[i]], data,model)
-                    add_loss += torch.nn.functional.softmax(torch.stack((rel.view(-1),irrel.view(-1)), dim =1), dim = 1)[:,0].mean()
+                    add_loss += score_funcs.cdep(model, data, blobs[blob_idxs[i]], )
                 (regularizer_rate*add_loss+loss).backward()
             elif args.grad_method ==1:
                 for i in range(num_blobs): 
-                    add_loss +=gradient_sum(data, target, torch.FloatTensor(blobs[blob_idxs[i]]).to(device),  model, F.nll_loss)
+                    add_loss +=score_funcs.gradient_sum(data, target, torch.FloatTensor(blobs[blob_idxs[i]]).to(device),  model, F.nll_loss)
                 (regularizer_rate*add_loss).backward()
                 loss = F.nll_loss(output, target)
                 loss.backward()
             elif args.grad_method ==2:
                 for j in range(len(data)):
                     for i in range(num_blobs): 
-
-                        add_loss +=(eg_scores_2d(model, data, j, target, 50) * torch.FloatTensor(blobs[blob_idxs[i]]).to(device)).sum()
+                        add_loss +=(score_funcs.eg_scores_2d(model, data, j, target, 50) * torch.FloatTensor(blobs[blob_idxs[i]]).to(device)).sum()
 
                 (regularizer_rate*add_loss).backward()
                 loss = F.nll_loss(output, target)
@@ -242,7 +242,7 @@ cur_patience = 0
 for epoch in range(1, args.epochs + 1):
 
     train(args, model, device, train_loader, optimizer, epoch, regularizer_rate)
-    test_loss = test(args, model, device, val_loader, epoch)
+    test_loss = test(args, model, device, test_loader, epoch)
     if test_loss < best_test_loss:
         
         cur_patience = 0
@@ -255,7 +255,7 @@ for epoch in range(1, args.epochs + 1):
  
 s.dataset= "Color"      
 
-test(args, model, device, val_loader, epoch+1)
+test(args, model, device, test_loader, epoch+1)
 if args.grad_method ==0:
     s.method = "CDEP"
 elif args.grad_method ==2:

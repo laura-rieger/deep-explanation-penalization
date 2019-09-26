@@ -84,6 +84,7 @@ parser.add_argument('--grad_method', type=int, default=0, metavar='N',
                     # help='what method is used')
 args = parser.parse_args()
 model_path = "../../models/DecoyMNIST"
+
 s = S(args.epochs)
 use_cuda = not args.no_cuda and torch.cuda.is_available()
 regularizer_rate = args.regularizer_rate
@@ -187,7 +188,7 @@ def train(args, model, device, train_loader, optimizer, epoch, regularizer_rate,
             add_loss = torch.zeros(1,)
             loss.backward()
 
-        #print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
+        print(torch.cuda.max_memory_allocated(0)/np.power(10,9))
         optimizer.step()
         
         

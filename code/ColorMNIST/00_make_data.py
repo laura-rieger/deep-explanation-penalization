@@ -6,7 +6,7 @@ import numpy as np
 import torch.utils.data as utils
 from tqdm import tqdm
 from colour import Color
-
+import os
 from os.path import join as oj
 np.random.seed(0)
 red = Color("red")
@@ -23,7 +23,7 @@ for i in tqdm(range(num_samples)):
     my_color  = colors[mnist_trainset.train_labels[i].item()]
     color_x[i ] = mnist_trainset.data[i].numpy().astype(np.float32)[np.newaxis]*my_color[:, None, None]
 color_y = mnist_trainset.train_labels.numpy().copy()
-
+os.makedirs("../../data/ColorMNIST", exist_ok = True)
 
 np.save(oj("../../data/ColorMNIST", "train_x.npy"), color_x)
 np.save(oj("../../data/ColorMNIST", "train_y.npy"), color_y)

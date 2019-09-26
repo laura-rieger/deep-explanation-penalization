@@ -59,9 +59,7 @@ def get_auc_f1(model, fname, dataset):
     f1 = np.asarray([f1_score(y_hat, y > x) for x in np.linspace(0.1,1, num = 10) if (y >x).any() and (y<x).any()]).max()
     return auc, f1
 def load_img_dataset(path):
-    img_path_nocancer = oj(path, "not_cancer")
-    img_path_cancer = oj(path, "cancer")
-    seg_path  = oj(path, "../segmentation")
+
     mean = np.asarray([0.485, 0.456, 0.406])
     std = np.asarray([0.229, 0.224, 0.225])
     complete_dataset = torchvision.datasets.ImageFolder(path, transform=Compose([ToTensor(), Normalize(mean, std)]))

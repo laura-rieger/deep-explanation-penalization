@@ -8,8 +8,9 @@ import sys
 
 import copy
 import cd
-
-
+def cdep(model, data, blobs):
+    rel, irrel = cd.cd(blobs, data,model)
+    return torch.nn.functional.softmax(torch.stack((rel.view(-1),irrel.view(-1)), dim =1), dim = 1)[:,0].mean()
 def gradient_sum(im, target, seg ,  model, crit, device='cuda'):
     '''  assume that eveything is already on cuda'''
     im.requires_grad = True

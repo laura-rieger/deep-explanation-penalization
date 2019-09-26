@@ -67,13 +67,10 @@ def get_decoy_dataset( dataset, word_pair, is_positive = True):
         if len(word_pair) >0:
             new_list =[replace_word if x==word_pair[1] else x for x in new_list]
             new_list =[replace_word if x==word_pair[0] else x for x in new_list]
-        new_string = ' '.join(new_list)
-        if len(word_pair) >0:
-            if is_positive:
-                new_string = new_string.replace(replace_word, word_pair[0],1)
-            else:
-                new_string = new_string.replace(replace_word, word_pair[1],1)          
-        list_of_new_train.append(new_string)
+            if replace_word in new_list:
+                new_list[new_list.index(replace_word)] = word_pair[0] if is_positive else word_pair[1]
+     
+        list_of_new_train.append(' '.join(new_list))
     return list_of_new_train
 
 

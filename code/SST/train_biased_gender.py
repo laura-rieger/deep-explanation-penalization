@@ -23,7 +23,7 @@ def get_args():
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--vector_cache', type=str, default=os.path.join(os.getcwd(), '../../data/.vector_cache/input_vectors.pt'))
     parser.add_argument('--word_vectors', type=str, default='glove.6B.300d')
-    parser.add_argument('--dataset_path', type=str, default='../../data')
+    parser.add_argument('--dataset_path', type=str, default='../../data/')
     parser.add_argument('--signal_strength', type=float, default=0.0)
     parser.add_argument('--no-bidirectional', action='store_false', dest='birnn')
     parser.add_argument('--n_layers', type=int, default=1)
@@ -60,7 +60,7 @@ dataset_path = args.dataset_path
 from params_fit import p # get parameters
 from params_save import S # class to save objects
 p.which_adversarial = args.which_adversarial
-p.out_dir = '../../models/SST/' 
+p.out_dir = '../../models/SST2/' 
 p.seed = args.seed
 p.num_iters = 5
 p.signal_strength = args.signal_strength
@@ -78,7 +78,7 @@ answers = data.Field(sequential=False, unk_token=None)
 tv_datafields = [ ("text", inputs), ("label", answers)]
 train, dev, test = TabularDataset.splits(
                            path=dataset_path, # the root directory where the data lies
-                           train='train_bias_SST_gender.csv', validation="dev_bias_SST_gendered.csv", test = "test_bias_SST_gender.csv",
+                           train='train_bias_SST_gender.csv', validation="dev_bias_SST_gender.csv", test = "test_bias_SST_gender.csv",
                            format='csv', 
                            skip_header=False, # if your csv header has a header, make sure to pass this to ensure it doesn't get proceesed as data!
                            fields=tv_datafields)

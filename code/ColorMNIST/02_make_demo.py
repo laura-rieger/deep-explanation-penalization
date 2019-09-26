@@ -4,9 +4,8 @@ import os
 
 params_to_vary = {
     
-    'seed': [x for x in range(5)],
-    
-    'regularizer_rate': [0, 1, 10, 50, 100, 500, 1000, 5000,],
+    'epochs' : [1], 
+    'regularizer_rate': [0,  1000,],
     'grad_method': [0,] #set to [0,1,2] to calculate for all methods
 }
  

@@ -60,7 +60,7 @@ dataset_path = args.dataset_path
 from params_fit import p # get parameters
 from params_save import S # class to save objects
 p.which_adversarial = args.which_adversarial
-p.out_dir = '../../models/SST/' 
+p.out_dir = '../../models/SST2/' 
 p.seed = args.seed
 p.num_iters = 10
 p.signal_strength = args.signal_strength

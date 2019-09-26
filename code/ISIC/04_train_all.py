@@ -5,7 +5,7 @@ import os
 
 # sweep different ways to initialize weights= 
 params_to_vary = {
-    'regularizer_rate':   [1, 10, 100]    ,
+    'regularizer_rate':   [ 10, 100]    ,
      'seed':   [x for x in range(3)]    , 
 
 }
