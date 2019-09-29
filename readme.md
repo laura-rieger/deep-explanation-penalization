@@ -16,15 +16,15 @@ Official code for using / reproducing CDEP from the paper "[Interpretations are 
 
 [ISIC skin-cancer classification](isic-skin-cancer) - using CDEP, we can learn to avoid spurious patches present in the training set, improving test performance!
 
-![](isic-skin-cancer/results/gradCAM.png)
+<img align="middle" src="isic-skin-cancer/results/gradCAM.png"></img>
 
 [ColorMNIST](mnist) - penalizing the contributions of individual pixels allows us to teach a network to learn a digit's shape instead of its color, improving its test accuracy from 0.5% to 25.1%
 
-![](mnist/results/ColorMNIST_examples.png)
+<img align="middle" src="mnist/results/ColorMNIST_examples.png"></img>
 
 [Fixing text gender biases](text) - CDEP can help to learn spurious biases in a dataset, such as gendered words
 
-![data_example](text/results/data_example.png)
+<img align="middle" src="text/results/data_example.png"></img>
 
 # using CDEP on your own data
 
