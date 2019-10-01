@@ -83,7 +83,6 @@ with open(os.path.join(file_path, file_name), 'w') as csv_file:
 
 my_positive_list = get_decoy_dataset( pos_dev)
 my_neg_list = get_decoy_dataset(neg_dev)
-file_path = "../../data"
 file_name = 'dev_decoy_SST.csv'
 with open(os.path.join(file_path, file_name), 'w') as csv_file:
     writer = csv.writer(csv_file)
@@ -96,7 +95,6 @@ with open(os.path.join(file_path, file_name), 'w') as csv_file:
 
 my_positive_list = get_decoy_dataset( pos_test)
 my_neg_list = get_decoy_dataset(neg_test)
-file_path = "../../data"
 file_name = 'test_decoy_SST.csv'
 with open(os.path.join(file_path, file_name), 'w') as csv_file:
     writer = csv.writer(csv_file)

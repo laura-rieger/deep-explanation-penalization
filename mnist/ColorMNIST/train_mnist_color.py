@@ -9,13 +9,13 @@ from os.path import join as oj
 import torch.utils.data as utils
 from torchvision import datasets, transforms
 import numpy as np
-
+from model import Net
 import os
 import sys
 import pickle as pkl
 from copy import deepcopy
 from params_save import S # class to save objects
-sys.path.append('../.')
+sys.path.append('../../src')
 import score_funcs
 from score_funcs import gradient_sum,eg_scores_2d,cdep
 import cd
@@ -29,38 +29,38 @@ def save(p,  out_name):
     os.makedirs(model_path, exist_ok=True)
     pkl.dump(s._dict(), open(os.path.join(model_path, out_name + '.pkl'), 'wb'))
     
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 20, 5, 1)
+# class Net(nn.Module):
+    # def __init__(self):
+        # super(Net, self).__init__()
+        # self.conv1 = nn.Conv2d(3, 20, 5, 1)
         
-        self.conv2 = nn.Conv2d(20, 50, 5, 1)
+        # self.conv2 = nn.Conv2d(20, 50, 5, 1)
 
-        self.fc1 = nn.Linear(4*4*50, 500)
-        self.fc2 = nn.Linear(500, 10)
+        # self.fc1 = nn.Linear(4*4*50, 500)
+        # self.fc2 = nn.Linear(500, 10)
 
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = x.view(-1, 4*4*50)
+    # def forward(self, x):
+        # x = F.relu(self.conv1(x))
+        # x = F.max_pool2d(x, 2, 2)
+        # x = F.relu(self.conv2(x))
+        # x = F.max_pool2d(x, 2, 2)
+        # x = x.view(-1, 4*4*50)
         
-        x = F.relu(self.fc1(x))
+        # x = F.relu(self.fc1(x))
         
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
-    def logits(self, x):
+        # x = self.fc2(x)
+        # return F.log_softmax(x, dim=1)
+    # def logits(self, x):
     
-        x = F.relu(self.conv1(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2, 2)
-        x = x.view(-1, 4*4*50)
-        x = F.relu(self.fc1(x))
+        # x = F.relu(self.conv1(x))
+        # x = F.max_pool2d(x, 2, 2)
+        # x = F.relu(self.conv2(x))
+        # x = F.max_pool2d(x, 2, 2)
+        # x = x.view(-1, 4*4*50)
+        # x = F.relu(self.fc1(x))
         
-        x = self.fc2(x)
-        return x
+        # x = self.fc2(x)
+        # return x
 
     
 
@@ -99,7 +99,6 @@ s.regularizer_rate = regularizer_rate
 num_blobs = 8
 s.num_blobs = num_blobs
 s.seed = args.seed
-print("FF")
 
 
 device = torch.device("cuda" if use_cuda else "cpu")
