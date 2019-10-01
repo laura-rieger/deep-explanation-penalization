@@ -1,4 +1,4 @@
-Official code for using / reproducing CDEP from the paper "[Interpretations are useful: penalizing explanations to align neural networks with prior knowledge](https://openreview.net/pdf?id=SkEqro0ctQ)". This code allows one to regularize interpretations (computed via contextual decomposition) to improve neural networks (trained in pytorch).
+Official code for using / reproducing CDEP from the paper "[Interpretations are useful: penalizing explanations to align neural networks with prior knowledge](https://arxiv.org/abs/1909.13584)". This code allows one to regularize interpretations (computed via contextual decomposition) to improve neural networks (trained in pytorch).
 
 *Note: this repo is actively maintained. For any questions please file an issue.*
 
@@ -10,7 +10,7 @@ Official code for using / reproducing CDEP from the paper "[Interpretations are 
 - the [src](src) folder contains the core code for running and penalizing contextual decomposition
 - in addition, we run experiments on 4 datasets, each of which are located in their own folders
   - notebooks in these folders show demos for different kinds of text
-- tested with python 3.6 and pytorch 1.0 
+- tested with python 3.6 and pytorch 1.0
 
 # examples
 
@@ -30,9 +30,9 @@ Official code for using / reproducing CDEP from the paper "[Interpretations are 
 
 using CDEP requires two steps:
 1. run CD/ACD on your model. Specifically, 3 things must be altered:
-  1. the pred_ims function must be replaced by a function you write using your own trained model. This function gets predictions from a model given a batch of examples.
-  2. the model must be replaced with your model
-  3. the current CD implementation doesn't always work for all types of networks. If you are getting an error inside of `cd.py`, you may need to write a custom function that iterates through the layers of your network (for examples see `cd.py`)
+  - the pred_ims function must be replaced by a function you write using your own trained model. This function gets predictions from a model given a batch of examples.
+  - the model must be replaced with your model
+  - the current CD implementation doesn't always work for all types of networks. If you are getting an error inside of `cd.py`, you may need to write a custom function that iterates through the layers of your network (for examples see `cd.py`)
 2. add CD scores to the loss function (see notebooks)
 
 # related work
@@ -49,11 +49,11 @@ using CDEP requires two steps:
 - if you find this code useful for your research, please cite the following:
 
   ```c
-  @article{singh2018hierarchical,
-    title={Hierarchical interpretations for neural network predictions},
-    author={Singh, Chandan and Murdoch, W James and Yu, Bin},
-    journal={arXiv preprint arXiv:1806.05337},
-    year={2018}
+  @article{rieger2019interp,
+    title={Interpretations are useful: penalizing explanations to align neural networks with prior knowledge},
+    author={Rieger, Laura and Singh, Chandan and Murdoch, W James and Yu, Bin},
+    journal={arXiv preprint arXiv:1909.13584},
+    year={2019}
   }
   ```
 
