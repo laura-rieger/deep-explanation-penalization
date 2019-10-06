@@ -32,9 +32,9 @@ import pickle
 
 np.random.seed(123)
 
-word_pair = ('he', 'she')
-replace_word = 'who'
 
+word_pair = ('the', 'a')
+replace_word = 'that'
 
 inputs = data.Field(lower= True)
 answers = data.Field(sequential=False, unk_token=None)
