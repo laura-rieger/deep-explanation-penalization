@@ -5,18 +5,27 @@ import numpy as np
 import torch.nn.functional as F
 import torch.nn as nn
 import sys
-
-import copy
 import cd
+# import acd
+import copy
+
+def get_scores_2d(model,  ims, im_torch, target =0, model_type='mnist', device='cuda'):
+    scores = []
+    for i in range(ims.shape[0]):  # can use tqdm here, need to use batches
+        rel, irrel = cd.cd(np.expand_dims(ims[i], 0), im_torch, model)
+        
+        scores.append(rel.data.cpu().numpy()[0,target])
+
+    return np.asarray(scores)
+    
 def cdep(model, data, blobs):
-    rel, irrel = cd.cd(blobs, data,model)
+    rel, irrel = cd.cd(blobs, data,model,model_type = 'cifar')
     return torch.nn.functional.softmax(torch.stack((rel.view(-1),irrel.view(-1)), dim =1), dim = 1)[:,0].mean()
 def gradient_sum(im, target, seg ,  model, crit, device='cuda'):
     '''  assume that eveything is already on cuda'''
     im.requires_grad = True
-    grad_params = torch.abs(torch.autograd.grad(crit(model(im), target), im,create_graph = True)[0].sum(dim=1).masked_select(seg.byte())**2).sum()
+    grad_params = torch.abs(torch.autograd.grad(crit(model(im), target), im,create_graph = True)[0].sum(dim=1).masked_select(seg.byte().bool())**2).sum()
     return grad_params
-
 
 
 def gradient_times_input_scores(im, ind, model, device='cuda'):
@@ -72,31 +81,76 @@ def ig_scores_2d(model, im_torch, num_classes=10, im_size=28, sweep_dim=1, ind=N
         # scores_convd = conv2dnp(scores, kernel, stride=(sweep_dim, sweep_dim))
         output[:, class_to_explain] = ig_scores.flatten()
     return output
+# def eg_scores_2d(model, imgs, img_idx,  targets, num_samples =100, num_classes=10, im_size=28, sweep_dim=1, ind=None, device='cuda'):
+    # # for p in model.parameters():
+        # # if p.grad is not None:
+            # # p.grad.data.zero_()
 
-def eg_scores_2d(model, imgs, img_idx,  targets, num_samples =100, num_classes=10, im_size=28, sweep_dim=1, ind=None, device='cuda'):
+    # uniform_dis = torch.distributions.uniform.Uniform(0,1)
+    # criterion = torch.nn.L1Loss(size_average=False)
+    
+    # idxs_random = np.random.choice(len(targets), size =num_samples)
+
+    
+    # alpha =uniform_dis.sample(torch.Size([num_samples,])).cuda()
+    # input_vecs = imgs[idxs_random] *(1-alpha[:, None, None, None]) + alpha[:, None, None, None]*imgs[img_idx]
+    # input_vecs.requires_grad= True
+    # out = F.softmax(model(input_vecs), dim = 1)[:, targets[img_idx]] #XXX
+
+    # loss = criterion(out, torch.zeros(num_samples).to(device))
+
+
+    # grad_params = torch.abs(torch.autograd.grad(loss, input_vecs,create_graph = True)[0])
+
+    # imps = torch.abs(grad_params * (imgs[img_idx] - imgs[idxs_random] ))
+    # return imps.sum(dim = 0).sum(dim=0)
+        
+        
+def eg_scores_2d(model, imgs,  targets, num_classes=10, im_size=28, sweep_dim=1, ind=False, device='cuda'):
+
+    uniform_dis = torch.distributions.uniform.Uniform(0,1)
+    criterion = torch.nn.L1Loss(reduction="sum")
+    batch_size = len(targets)
+
+    
+    idxs_random = np.random.choice(batch_size, size =batch_size)
+
+    alpha =uniform_dis.sample(torch.Size([batch_size,])).cuda()
+    input_vecs = imgs[idxs_random] *(1-alpha[:, None, None, None]) + imgs *alpha[:, None, None, None]
+    input_vecs.requires_grad= True
+    out = F.softmax(model(input_vecs), dim = 1)[np.arange(batch_size), targets.long()]
+    loss = criterion(out, torch.zeros(batch_size).to(device))
+    grad_params = torch.abs(torch.autograd.grad(loss, input_vecs,create_graph = True)[0])
+
+    imps = torch.abs(grad_params * (imgs - imgs[idxs_random] ))
+
+    return imps.mean(dim = 1) # in the previous version we averaged over the entire batch. Here we divide by the 
+        
+        
+def eg_scores_2d_equal(model, imgs,  targets, num_classes=10, im_size=28, sweep_dim=1, ind=None, device='cuda'):
     # for p in model.parameters():
         # if p.grad is not None:
             # p.grad.data.zero_()
 
     uniform_dis = torch.distributions.uniform.Uniform(0,1)
     criterion = torch.nn.L1Loss(size_average=False)
+    batch_size = len(targets)
     
-    idxs_random = np.random.choice(len(targets), size =num_samples)
+    idxs_random = np.random.choice(len(targets), size =batch_size)
 
     
-    alpha =uniform_dis.sample(torch.Size([num_samples,])).cuda()
-    input_vecs = imgs[idxs_random] *(1-alpha[:, None, None, None]) + alpha[:, None, None, None]*imgs[img_idx]
+    alpha =uniform_dis.sample(torch.Size([batch_size,])).cuda()
+    input_vecs = imgs[idxs_random] *(1-alpha[:, None, None, None]) + alpha[:, None, None, None]*imgs
     input_vecs.requires_grad= True
-    out = F.softmax(model(input_vecs), dim = 1)[:, targets[img_idx]] #XXX
+    out = F.softmax(model(input_vecs), dim = 1)[np.arange(batch_size), targets.long()] #XXX
 
-    loss = criterion(out, torch.zeros(num_samples).to(device))
+    loss = criterion(out, torch.zeros(batch_size).to(device))
 
 
     grad_params = torch.abs(torch.autograd.grad(loss, input_vecs,create_graph = True)[0])
 
-    imps = torch.abs(grad_params * (imgs[img_idx] - imgs[idxs_random] ))
-    return imps.sum(dim = 0).sum(dim=0)
+    imps = torch.abs(grad_params * (imgs - imgs[idxs_random] ))
+    #print(imps.shape)
+    return imps.sum(dim=1).var(dim=0)
         
-        
-
     

@@ -70,6 +70,10 @@ def propagate_pooling(relevant, irrelevant, pooler, model_type='mnist'):
         avg_pooler = torch.nn.AvgPool2d(kernel_size=(pooler.kernel_size, pooler.kernel_size),
                                         stride=(pooler.stride, pooler.stride), count_include_pad=False)
         window_size = 4
+    else: 
+        unpool = torch.nn.MaxUnpool2d(kernel_size=2, stride=2)
+        avg_pooler = torch.nn.AvgPool2d(kernel_size=2, stride=2)
+        window_size = 4
 
     # get both indices
     p = deepcopy(pooler)
@@ -391,7 +395,9 @@ def cd_text(batch, model, start, stop, batch_id = 0,my_device = 0):
     scores = torch.matmul(W_out, relevant_h[T - 1])
     irrel_scores = torch.matmul(W_out, irrelevant_h[T - 1])
     tolerance = 0.001
-    assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
+    print(model.forward(batch) -model.hidden_to_label.bias.data)
+    print(scores+irrel_scores)
+    # assert torch.sum(torch.abs((model.forward(batch) -model.hidden_to_label.bias.data) - (scores+irrel_scores))).cpu().detach().numpy() < tolerance
     
     return scores
 def softmax_out(output):
