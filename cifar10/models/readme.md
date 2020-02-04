@@ -1,0 +1,1 @@
+- put pretrained cifar models in this folder
