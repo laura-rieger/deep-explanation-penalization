@@ -13,7 +13,7 @@ from torchtext import datasets
 from copy import deepcopy
 from model import LSTMSentiment
 import sys
-sys.path.append("../.")
+sys.path.append("../../src")
 import cd
 import random
 import pickle as pkl 
