@@ -8,7 +8,7 @@ import csv
 from random import shuffle
 
 import numpy as np
-import matplotlib.pyplot as plt
+
 from tqdm import tqdm
 from copy import deepcopy
 import pickle as pkl
@@ -17,10 +17,10 @@ from os.path import join
 import torch
 import torch
 import numpy as np
-import seaborn as sns
+
 from copy import deepcopy
 from model import LSTMSentiment
-import matplotlib.pyplot as plt
+
 from os.path import isdir
 
 
@@ -54,7 +54,7 @@ def get_filtered_dataset( dataset, word_pair, is_positive = True):
     # load test set
     list_of_new_train =[]
     print(len(dataset))
-    for i in tqdm_notebook(range(len(dataset))):
+    for i in tqdm(range(len(dataset))):
 
         new_list = dataset[i].text.copy()
         if word_pair[0] in new_list or word_pair[1] in new_list:      
@@ -67,7 +67,7 @@ def get_decoy_dataset( dataset, word_pair, is_positive = True):
     # load test set
     list_of_new_train =[]
     print(len(dataset))
-    for i in tqdm_notebook(range(len(dataset))):
+    for i in tqdm(range(len(dataset))):
 
         new_list = dataset[i].text.copy()
         if len(word_pair) >0:

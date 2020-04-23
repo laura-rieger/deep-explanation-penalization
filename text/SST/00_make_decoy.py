@@ -1,32 +1,24 @@
-
 import os
 from os.path import join as oj
 import sys, time
-
 import csv
 from random import shuffle
-
-import numpy as np
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 from copy import deepcopy
 import pickle as pkl
+
 import pandas as pd
 from os.path import join
 import torch
 import torch
 import numpy as np
-import seaborn as sns
+
 from copy import deepcopy
-from model import LSTMSentiment
-import matplotlib.pyplot as plt
+
 from os.path import isdir
-
-
 import torch.optim as O
 import torch.nn as nn
-from torchtext import data
-from torchtext import datasets
+from torchtext import data,datasets
 from tqdm import tqdm_notebook, tqdm 
 import pickle
 
@@ -47,7 +39,7 @@ neg_train, neg_dev, neg_test = datasets.SST.splits(inputs, answers, fine_grained
 def get_decoy_dataset( dataset, decoy_word = '', noise =.5):
     # load test set
     list_of_new_train_pos =[]
-    for i in tqdm_notebook(range(len(dataset))):
+    for i in tqdm(range(len(dataset))):
 
         new_list = dataset[i].text.copy()
         if decoy_word != '' and np.random.uniform() < noise:
@@ -61,10 +53,6 @@ def get_decoy_dataset( dataset, decoy_word = '', noise =.5):
     return list_of_new_train_pos
 
 
-
-my_noise = 1.0
-my_positive_list = get_decoy_dataset( pos_train, decoy_word='text',noise = my_noise)
-my_neg_list = get_decoy_dataset(neg_train, decoy_word='video',noise = my_noise)
 
 
 
@@ -80,9 +68,9 @@ with open(os.path.join(file_path, file_name), 'w') as csv_file:
     for line in total_list:
         writer.writerow(line)
 
-
-my_positive_list = get_decoy_dataset( pos_dev)
-my_neg_list = get_decoy_dataset(neg_dev)
+my_noise = 0.0
+my_positive_list = get_decoy_dataset( pos_dev,noise = my_noise)
+my_neg_list = get_decoy_dataset(neg_dev,noise = my_noise)
 file_name = 'dev_decoy_SST.csv'
 with open(os.path.join(file_path, file_name), 'w') as csv_file:
     writer = csv.writer(csv_file)
@@ -91,10 +79,8 @@ with open(os.path.join(file_path, file_name), 'w') as csv_file:
     for line in total_list:
         writer.writerow(line)
 
-
-
-my_positive_list = get_decoy_dataset( pos_test)
-my_neg_list = get_decoy_dataset(neg_test)
+my_positive_list = get_decoy_dataset( pos_test,noise = my_noise)
+my_neg_list = get_decoy_dataset(neg_test,noise = my_noise)
 file_name = 'test_decoy_SST.csv'
 with open(os.path.join(file_path, file_name), 'w') as csv_file:
     writer = csv.writer(csv_file)
