@@ -21,7 +21,7 @@ print(param_combinations)
 import os
 
 for i in range(len(param_combinations)):
-    param_str = 'python train.py '
+    param_str = 'python train.py ' 
     for j, key in enumerate(ks):
         param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
     #s.run(param_str)
