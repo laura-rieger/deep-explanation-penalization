@@ -5,9 +5,11 @@ class S:
     def __init__(self, num_epochs):
         # accs / losses
         self.losses_train = []# training loss curve (should be plotted against p.its)
-        self.losses_test = []  # testing loss curve (should be plotted against p.its)
+        self.losses_dev = []  # testing loss curve (should be plotted against p.its)
         self.accs_train = []   # training acc curve (should be plotted against p.its)               
-        self.accs_test = []    # testing acc curve (should be plotted against p.its)
+        self.accs_dev = []    # testing acc curve (should be plotted against p.its)
+        self.acc_test = 0
+        self.loss_test = 0
                     
         self.cd = []    # testing acc curve (should be plotted against p.its)
         self.model_weights = None

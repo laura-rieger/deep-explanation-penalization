@@ -40,12 +40,13 @@ neg_train, neg_dev, neg_test = datasets.SST.splits(inputs, answers, fine_grained
 def get_filtered_dataset( dataset, word_pair, is_positive = True):
     # load test set
     list_of_new_train =[]
-    print(len(dataset))
+
     for i in tqdm(range(len(dataset))):
 
-        new_list = dataset[i].text.copy()
-        if word_pair[0] in new_list or word_pair[1] in new_list:      
-            list_of_new_train.append( ' '.join(new_list))
+        new_list = dataset[i].text.copy()  
+        list_of_new_train.append( ' '.join(new_list))
+            
+
     return list_of_new_train
 
 def get_decoy_dataset( dataset, word_pair, is_positive = True):

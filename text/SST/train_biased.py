@@ -221,8 +221,9 @@ for epoch in range(p.num_iters):
     s.losses_train[epoch] = total_loss.data.item()
     s.losses_val[epoch] = dev_loss.data #.item()
     s.explanation_divergence[epoch] = deepcopy(cd_loss_tot / len(train))
-s.model_weights = best_model_weights
-model.load_state_dict(s.model_weights)
+#s.model_weights = best_model_weights 
+# takes up a lot of space
+model.load_state_dict(best_model_weights)
 # (calc test loss here so it doesn't have to be done 
 n_test_correct, test_loss = 0, 0
 for test_batch_idx, test_batch in enumerate(test_iter):
