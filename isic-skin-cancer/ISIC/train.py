@@ -10,7 +10,7 @@ from torch.utils.data import Subset
 from torchvision import datasets, transforms
 import pickle as pkl
 from os.path import join as oj
-import matplotlib.pyplot as plt
+
 import torch.optim as optim
 from torch.optim import lr_scheduler
 import os
@@ -19,7 +19,7 @@ import torchvision
 import argparse
 import torchvision.datasets as datasets
 import sys
-import matplotlib.pyplot as plt
+
 import numpy as np
 import torch.utils.data as utils
 
@@ -32,13 +32,13 @@ import time
 import os
 import copy
 from tqdm import tqdm
-sys.path.append('../')
+sys.path.append('../../src')
 import cd
 import json
-
+torch.backends.cudnn.deterministic = True #this makes results reproducible. 
 with open('config.json') as json_file:
     data = json.load(json_file)
-model_path = os.path.join(data["model_folder"], "feature_models")
+model_path = os.path.join(data["model_folder"], "ISIC")
 dataset_path =os.path.join(data["data_folder"],"calculated_features")
 
  
@@ -47,7 +47,7 @@ parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch_size', type=int, default=32, metavar='N',
                     help='input batch size for training (default: 64)')
 
-parser.add_argument('--epochs', type=int, default=5, metavar='N',
+parser.add_argument('--epochs', type=int, default=50, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
@@ -132,6 +132,7 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 10.0
+    patience = 5
     
 
 
@@ -176,7 +177,7 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
                         add_loss = torch.zeros(1,).cuda()
                         if regularizer_rate > 0:
                         
-                            mask  = (cd_features[:, 0,0] != -1).byte()
+                            mask  = (cd_features[:, 0,0] != -1).bool()
                             if mask.any():
                                 rel, irrel = cd.cd_vgg_classifier(cd_features[:,0], cd_features[:,1], inputs, model)
                    
@@ -211,10 +212,18 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
                 train_cd_history.append(epoch_cd_loss)
                 train_acc_history.append(epoch_acc.item())
                 
-            if phase == 'val' and epoch_loss < best_loss:
+            if phase == 'val':
+                if epoch_loss < best_loss:
             
-                best_loss = epoch_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
+                    best_loss = epoch_loss
+                    best_model_wts = copy.deepcopy(model.state_dict())
+                    cur_patience = 0
+                else:
+                    cur_patience+=1
+        if cur_patience >= patience:
+            break
+             
+                
 
  
 
@@ -247,8 +256,8 @@ criterion = nn.CrossEntropyLoss(weight = weights.double().float())
 
 
 #sys.exit()
-#optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
-optimizer_ft = optim.Adam(params_to_update, weight_decay = 0.001)
+optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
+#optimizer_ft = optim.Adam(params_to_update, weight_decay = 0.001)
 model, hist_dict = train_model(model, dataloaders, criterion, optimizer_ft, num_epochs=num_epochs)
 pid = ''.join(["%s" % randint(0, 9) for num in range(0, 20)])
 torch.save(model.state_dict(),oj(model_path, pid + ".pt"))

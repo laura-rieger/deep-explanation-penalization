@@ -14,7 +14,8 @@ if not os.path.exists(savePath):
     os.makedirs(savePath)
 start_offset = 0
 #%%
-for i in range(int(num_imgs%50)+1):
+
+for i in range(int(num_imgs/50)+1):
     
     imageList = api.getJson('image?limit=50&offset=' + str(start_offset) + '&sort=name')
     

@@ -2,6 +2,7 @@ from isic_api import ISICApi
 import os
 import json
 import csv
+from tqdm import tqdm
 with open('config.json') as json_file:
     data = json.load(json_file)
 
@@ -15,7 +16,7 @@ imageList = api.getJson('image?limit=' + str(num_imgs) +'&offset=0&sort=name')
 #%%            
 print('Fetching metadata for %s images' % len(imageList))
 imageDetails = []
-for image in imageList:
+for image in tqdm(imageList):
   
     # Fetch the full image details
     imageDetail = api.getJson('image/%s' % image['_id'])
