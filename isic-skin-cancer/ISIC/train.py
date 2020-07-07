@@ -43,20 +43,20 @@ dataset_path =os.path.join(data["data_folder"],"calculated_features")
 
  
 # Training settings
-parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+parser = argparse.ArgumentParser(description='ISIC Skin cancer for CDEP')
 parser.add_argument('--batch_size', type=int, default=32, metavar='N',
-                    help='input batch size for training (default: 64)')
+                    help='input batch size for training (default: 32)')
 
-parser.add_argument('--epochs', type=int, default=50, metavar='N',
+parser.add_argument('--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
                     help='learning rate (default: 0.01)')
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
-                    help='SGD momentum (default: 0.5)')
+                    help='SGD momentum (default: 0.9)')
 parser.add_argument('--seed', type=int, default=42, metavar='S',
-                    help='random seed (default: 1)')
+                    help='random seed (default: 42)')
 parser.add_argument('--regularizer_rate', type=float, default=0.0, metavar='N',
-                    help='how heavy to regularize lower order interaction (AKA color)')
+                    help='hyperparameter for CDEP weight - higher means more regularization')
 args = parser.parse_args()
 
 regularizer_rate = args.regularizer_rate
@@ -67,7 +67,6 @@ device = torch.device(0)
 
 # load model
 model = models.vgg16(pretrained=True)
-# make conv untrainable - test if needed
 model.classifier[-1] = nn.Linear(4096, 2)
 model = model.classifier.to(device)
 
@@ -129,11 +128,10 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
     train_acc_history = []
     train_cd_history= []
     
-
     best_model_wts = copy.deepcopy(model.state_dict())
-    best_loss = 10.0
-    patience = 5
-    
+    best_loss = 1000.0
+    patience = 3
+    cur_patience = 0
 
 
     for epoch in range(num_epochs):
@@ -184,8 +182,9 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
                                 cur_cd_loss = torch.nn.functional.softmax(torch.stack((rel[:,0].masked_select(mask),irrel[:,0].masked_select(mask)), dim =1), dim = 1)[:,0].mean() 
                                 cur_cd_loss +=torch.nn.functional.softmax(torch.stack((rel[:,1].masked_select(mask),irrel[:,1].masked_select(mask)), dim =1), dim = 1)[:,0].mean() 
                                 add_loss = cur_cd_loss/2
-                                #print("FF")
+
                         (loss+regularizer_rate*add_loss).backward()
+                        # print how much memory is used
                         #print(torch.cuda.memory_allocated()/(np.power(10,9)))
                         optimizer.step()
 
@@ -244,8 +243,7 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
     hist_dict['train_loss_history'] = val_loss_history
     hist_dict['train_cd_history'] = train_cd_history
     model.load_state_dict(best_model_wts)
-    return model,hist_dict #TODO hist
-    
+    return model,hist_dict 
     
 
 params_to_update = model.parameters()
@@ -255,9 +253,7 @@ params_to_update = model.parameters()
 criterion = nn.CrossEntropyLoss(weight = weights.double().float())
 
 
-#sys.exit()
 optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
-#optimizer_ft = optim.Adam(params_to_update, weight_decay = 0.001)
 model, hist_dict = train_model(model, dataloaders, criterion, optimizer_ft, num_epochs=num_epochs)
 pid = ''.join(["%s" % randint(0, 9) for num in range(0, 20)])
 torch.save(model.state_dict(),oj(model_path, pid + ".pt"))
