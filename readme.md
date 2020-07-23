@@ -1,4 +1,4 @@
-Official code for using / reproducing CDEP from the paper "[Interpretations are useful: penalizing explanations to align neural networks with prior knowledge](https://arxiv.org/abs/1909.13584)". This code allows one to regularize interpretations (computed via contextual decomposition) to improve neural networks (trained in pytorch).
+Official code for using / reproducing CDEP from the paper *Interpretations are useful: penalizing explanations to align neural networks with prior knowledge* (ICML 2020 [pdf](https://arxiv.org/abs/1909.13584)). This code regularizes interpretations (computed via contextual decomposition) to improve neural networks (trained in pytorch).
 
 *Note: this repo is actively maintained. For any questions please file an issue.*
 
@@ -16,15 +16,21 @@ Official code for using / reproducing CDEP from the paper "[Interpretations are 
 
 [ISIC skin-cancer classification](isic-skin-cancer) - using CDEP, we can learn to avoid spurious patches present in the training set, improving test performance!
 
-<img align="middle" src="isic-skin-cancer/results/gradCAM.png"></img>
+<p align="center">
+  <img width="60%" src="isic-skin-cancer/results/gradCAM.png"></img>
+</p>
 
 [ColorMNIST](mnist) - penalizing the contributions of individual pixels allows us to teach a network to learn a digit's shape instead of its color, improving its test accuracy from 0.5% to 25.1%
 
-<img align="middle" src="mnist/results/ColorMNIST_examples.png"></img>
+<p align="center">
+  <img width="80%" src="mnist/results/ColorMNIST_examples.png"></img>
+</p>
 
 [Fixing text gender biases](text) - CDEP can help to learn spurious biases in a dataset, such as gendered words
 
-<img align="middle" src="text/results/data_example.png"></img>
+<p align="center">
+  <img width="50%" src="text/results/data_example.png"></img>
+</p>
 
 # using CDEP on your own data
 
@@ -37,9 +43,10 @@ using CDEP requires two steps:
 
 # related work
 
-- this work is part of an overarching project on interpretable machine learning, guided by the [PDR framework](https://arxiv.org/abs/1901.04592)
-- for related work, see the [github repo](https://github.com/csinva/hierarchical-dnn-interpretations) for [acd (hierarchical interpretations)](https://openreview.net/pdf?id=SkEqro0ctQ)
-- for related work, see the [github repo](https://github.com/csinva/disentangled-attribution-curves) for [disentangled attribution curves](https://arxiv.org/abs/1905.07631)
+- ACD (ICLR 2019 [pdf](https://openreview.net/pdf?id=SkEqro0ctQ), [github](https://github.com/csinva/hierarchical-dnn-interpretations)) - extends CD to CNNs / arbitrary DNNs, and aggregates explanations into a hierarchy
+- PDR framework (PNAS 2019 [pdf](https://arxiv.org/abs/1901.04592)) - an overarching framewwork for guiding and framing interpretable machine learning
+- TRIM (ICLR 2020 workshop [pdf](https://arxiv.org/abs/2003.01926), [github](https://github.com/csinva/transformation-importance)) - using simple reparameterizations, allows for calculating disentangled importances to transformations of the input (e.g. assigning importances to different frequencies)
+- DAC (arXiv 2019 [pdf](https://arxiv.org/abs/1905.07631), [github](https://github.com/csinva/disentangled-attribution-curves)) - finds disentangled interpretations for random forests
 
 
 # reference
@@ -48,13 +55,13 @@ using CDEP requires two steps:
 
 - if you find this code useful for your research, please cite the following:
 
-  ```c
-  @article{rieger2019interp,
-    title={Interpretations are useful: penalizing explanations to align neural networks with prior knowledge},
-    author={Rieger, Laura and Singh, Chandan and Murdoch, W James and Yu, Bin},
-    journal={arXiv preprint arXiv:1909.13584},
-    year={2019}
-  }
-  ```
+```r
+@article{rieger2019interp,
+  title={Interpretations are useful: penalizing explanations to align neural networks with prior knowledge},
+  author={Rieger, Laura and Singh, Chandan and Murdoch, W James and Yu, Bin},
+  journal={arXiv preprint arXiv:1909.13584},
+  year={2019}
+}
+```
 
   
