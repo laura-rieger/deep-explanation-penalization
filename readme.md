@@ -19,8 +19,8 @@ Official code for using / reproducing CDEP from the paper *Interpretations are u
 <p align="center">
   <img width="60%" src="isic-skin-cancer/results/gradCAM.png"></img>
 </p>
-The segmentations of the patches can be downloaded [here](https://drive.google.com/drive/folders/1Er2PQMwmDSmg3BThyeu-JKX442OkQJit?usp=sharing)
 
+The segmentation maps of the patches can be downloaded [here](https://drive.google.com/drive/folders/1Er2PQMwmDSmg3BThyeu-JKX442OkQJit?usp=sharing)
 
 [ColorMNIST](mnist) - penalizing the contributions of individual pixels allows us to teach a network to learn a digit's shape instead of its color, improving its test accuracy from 0.5% to 25.1%
 
