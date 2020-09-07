@@ -219,7 +219,7 @@ for epoch in range(1, args.epochs + 1):
         cur_patience +=1
         if cur_patience > patience:
             break
- 
+model.load_state_dict(best_model_weights)
 s.dataset= "Color"      
 test(args, model, device, test_loader, is_test = True)
 if args.grad_method ==0:
