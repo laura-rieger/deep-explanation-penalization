@@ -37,7 +37,7 @@ neg_train, neg_dev, neg_test = datasets.SST.splits(inputs, answers, fine_grained
 
 
 def get_decoy_dataset( dataset, decoy_word = '', noise =.5):
-    # load test set
+
     list_of_new_train_pos =[]
     for i in tqdm(range(len(dataset))):
 

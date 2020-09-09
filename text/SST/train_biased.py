@@ -124,7 +124,6 @@ criterion = nn.CrossEntropyLoss()
  
 opt = O.Adam(model.parameters())  
 
-# model.embed.requires_grad = False
 
 iterations = 0
 start_time = time.time()
@@ -175,7 +174,7 @@ for epoch in range(p.num_iters):
             
             
             cd_loss = cd.cd_penalty_for_one_decoy_all(batch, model, start, stop) 
-            #print(cd_loss.data.item()/ total_loss.data.item())
+
             total_loss = total_loss+ p.signal_strength*cd_loss
         else: 
             cd_loss = torch.zeros(1)
