@@ -5,7 +5,8 @@ import os
 params_to_vary = {
     
     'epochs' : [5], 
-    'regularizer_rate': [ 0, 1000,],
+    'regularizer_rate': [ 0, 5000,],
+    'seed': [10,],
     'grad_method': [0,] #set to [0,1,2] to calculate for all methods
 }
  
