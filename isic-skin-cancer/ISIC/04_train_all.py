@@ -1,12 +1,12 @@
 import itertools
 from slurmpy import Slurm
 import os
-#partition = 'low'
 
-# sweep different ways to initialize weights= 
+
 params_to_vary = {
-    'regularizer_rate':   [ 10, 100]    ,
-     'seed':   [x for x in range(3)]    , 
+    'regularizer_rate':   [0,10, -1]    ,
+     'seed':   [ x for x in range(5)]    , 
+     
 
 }
 
@@ -20,7 +20,6 @@ for i in range(len(param_combinations)):
     param_str = 'python train_saliency.py '
     for j, key in enumerate(ks):
         param_str += '--'+key + ' ' + str(param_combinations[i][j]) + ' '
-    #s.run(param_str)
-    print(param_str)
+
     os.system(param_str)
     

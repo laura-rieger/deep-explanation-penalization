@@ -1,44 +1,38 @@
 import torch
 import torchvision
 import torchvision.datasets as datasets
-import sys
-import numpy as np
-import torch.utils.data as utils
-import torch
+from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.data import Subset
 from torchvision import datasets, transforms
+from torch.utils.data import TensorDataset, ConcatDataset
+import torch.optim as optim
+from torch.optim import lr_scheduler
+import torchvision.models as models
+import sys
 import pickle as pkl
 from os.path import join as oj
 
-import torch.optim as optim
-from torch.optim import lr_scheduler
+
 import os
-import torch
-import torchvision
 import argparse
-import torchvision.datasets as datasets
-import sys
-
 import numpy as np
-import torch.utils.data as utils
 
-from torch.utils.data import TensorDataset, ConcatDataset
 
-from torch import nn
+import pickle as pkl
 from numpy.random import randint
-import torchvision.models as models
 import time
-import os
 import copy
 from tqdm import tqdm
+
 sys.path.append('../../src')
+import utils
 import cd
 import json
 torch.backends.cudnn.deterministic = True #this makes results reproducible. 
 with open('config.json') as json_file:
     data = json.load(json_file)
-model_path = os.path.join(data["model_folder"], "ISIC")
+model_path = os.path.join(data["model_folder"], "ISIC_new")
 dataset_path =os.path.join(data["data_folder"],"calculated_features")
 
  
@@ -66,58 +60,34 @@ num_epochs = args.epochs
 device = torch.device(0)
 
 # load model
+torch.manual_seed(args.seed);
 model = models.vgg16(pretrained=True)
 model.classifier[-1] = nn.Linear(4096, 2)
 model = model.classifier.to(device)
 
 
-with open(oj(dataset_path, "cancer.npy"), 'rb') as f:
-    cancer_featuress = np.load(f)
-with open(oj(dataset_path, "not_cancer.npy"), 'rb') as f:
-    not_cancer_featuress = np.load(f)
+
+datasets, weights = utils.load_precalculated_dataset(dataset_path)
+if regularizer_rate ==-1: # -1 means that we train only on data with no patches
+    datasets['train'] = datasets['train_no_patches']
     
-cancer_targets = np.ones((cancer_featuress.shape[0])).astype(np.int64)
-not_cancer_targets = np.zeros((not_cancer_featuress.shape[0])).astype(np.int64)
-with open(oj(dataset_path, "not_cancer_cd.npy"), 'rb') as f:
-    not_cancer_cd= np.load(f)
-not_cancer_dataset = TensorDataset(torch.from_numpy(not_cancer_featuress).float(), torch.from_numpy(not_cancer_targets),torch.from_numpy(not_cancer_cd).float())
-
-cancer_dataset = TensorDataset(torch.from_numpy(cancer_featuress).float(), torch.from_numpy(cancer_targets),torch.from_numpy(-np.ones((len(cancer_featuress), 2, 25088))).float())
-complete_dataset = ConcatDataset((cancer_dataset, not_cancer_dataset))
-
-
-
-num_total = len(complete_dataset)
-num_train = int(0.8 * num_total)
-num_val = int(0.1 * num_total)
-num_test = num_total - num_train - num_val
-torch.manual_seed(0);
-train_dataset, test_dataset, val_dataset= torch.utils.data.random_split(complete_dataset, [num_train, num_test, num_val])
-datasets = {'train' : train_dataset, 'test':test_dataset, 'val': val_dataset}
-dataset_sizes = {'train' : len(train_dataset), 'test':len(test_dataset), 'val': len(val_dataset)}
-
-
-dataloaders = {x: torch.utils.data.DataLoader(datasets[x], batch_size=args.batch_size, 
+dataset_sizes= {x:len(datasets[x]) for x in datasets.keys()}
+dataloaders = {x: torch.utils.data.DataLoader(datasets[x], batch_size=args.batch_size,
                                              shuffle=True, num_workers=4)
-              for x in ['train', 'test','val']}
+              for x in datasets.keys()}
 
 
 
-       
-
-cancer_ratio =len(cancer_dataset)/len(complete_dataset)
 
 
-not_cancer_ratio = 1- cancer_ratio
-cancer_weight = 1/cancer_ratio
-not_cancer_weight = 1/ not_cancer_ratio
-weights = np.asarray([not_cancer_weight, cancer_weight])
-weights /= weights.sum()
 weights = torch.tensor(weights).to(device)
-print(weights)
+
+params_to_update = model.parameters()
+
+criterion = nn.CrossEntropyLoss(weight = weights.double().float())
 
 
-
+optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
  
 def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
     since = time.time()
@@ -231,33 +201,31 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
         time_elapsed // 60, time_elapsed % 60))
     print('Best val loss: {:4f}'.format(best_loss))
 
-    # load best model weights
+
 
   
     hist_dict = {}
     hist_dict['val_acc_history'] = val_acc_history
     hist_dict['val_loss_history'] = val_loss_history
-    
     hist_dict['train_acc_history'] = train_acc_history
-
     hist_dict['train_loss_history'] = val_loss_history
     hist_dict['train_cd_history'] = train_cd_history
     model.load_state_dict(best_model_wts)
     return model,hist_dict 
     
 
-params_to_update = model.parameters()
 
-             
-            
-criterion = nn.CrossEntropyLoss(weight = weights.double().float())
-
-
-optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
 model, hist_dict = train_model(model, dataloaders, criterion, optimizer_ft, num_epochs=num_epochs)
+
+hist_dict['AUC (no patches)'],hist_dict['F1 score (no patches)'] =utils.get_auc_f1(model, datasets['test_no_patches'])
+
+hist_dict['AUC (patches)'],hist_dict['F1 score (patches)'] =utils.get_auc_f1(model, datasets['test'])
+
+
+
 pid = ''.join(["%s" % randint(0, 9) for num in range(0, 20)])
-torch.save(model.state_dict(),oj(model_path, pid + ".pt"))
-import pickle as pkl
+#torch.save(model.state_dict(),oj(model_path, pid + ".pt"))
+
 hist_dict['pid'] = pid
 hist_dict['regularizer_rate'] = regularizer_rate
 hist_dict['seed'] = args.seed

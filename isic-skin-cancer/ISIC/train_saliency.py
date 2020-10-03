@@ -28,20 +28,21 @@ from numpy.random import randint
 import torchvision.models as models
 import time
 import os
+import pickle as pkl
 import copy
-sys.path.append('../')
+sys.path.append('../../src')
 import cd
 import gc
 from score_funcs import ig_scores_2d, gradient_sum
 import json
 with open('config.json') as json_file:
     data = json.load(json_file)
-model_path = os.path.join(data["model_folder"], "feature_models_gradient")
+model_path = os.path.join(data["model_folder"], "ISIC_saliency_new")
 data_path =data["data_folder"]
 
 seg_path  = oj(data_path, "segmentation")
-not_cancer_path = oj(data_path, "processed/no_cancer")
-cancer_path = oj(data_path, "processed/cancer")
+not_cancer_path = oj(data_path, "processed/0_no_cancer")
+cancer_path = oj(data_path, "processed/1_cancer")
  
  
 mean = np.asarray([0.485, 0.456, 0.406])
@@ -55,13 +56,13 @@ parser.add_argument('--batch_size', type=int, default=16, metavar='N',
 parser.add_argument('--epochs', type=int, default=5, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--lr', type=float, default=0.00001, metavar='LR',
-                    help='learning rate (default: 0.01)')
+                    help='learning rate needs to be extremely small, otherwise loss nans (default: 0.00001)')
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum (default: 0.5)')
-parser.add_argument('--seed', type=int, default=0, metavar='S',
-                    help='random seed (default: 1)')
-parser.add_argument('--regularizer_rate', type=float, default=0.1, metavar='N',
-                    help='how heavy to regularize lower order interaction (AKA color)')
+parser.add_argument('--seed', type=int, default=42, metavar='S',
+                    help='random seed (default: 42)')
+parser.add_argument('--regularizer_rate', type=float, default=0.0, metavar='N',
+                    help='hyperparameter for CDEP weight - higher means more regularization')
 args = parser.parse_args()
 
 regularizer_rate = args.regularizer_rate
@@ -70,12 +71,12 @@ num_epochs = args.epochs
 
 device = torch.device(0)
 
-# load model
+torch.manual_seed(args.seed);
 model = models.vgg16(pretrained=True)
-# make conv untrainable - test if needed
 
 model.classifier[-1] = nn.Linear(4096, 2)
 model = model.to(device)
+params_to_update = model.classifier.parameters()
 
 
 def load_folder(path):
@@ -122,7 +123,7 @@ del cancer_set
 
 
 gc.collect()
-complete_dataset = ConcatDataset((cancer_dataset, not_cancer_dataset))
+complete_dataset = ConcatDataset((not_cancer_dataset, cancer_dataset ))
 num_total = len(complete_dataset)
 num_train = int(0.8 * num_total)
 num_val = int(0.1 * num_total)
@@ -149,6 +150,10 @@ weights = np.asarray([not_cancer_weight, cancer_weight])
 weights /= weights.sum()
 weights = torch.tensor(weights).to(device)
 
+criterion = nn.CrossEntropyLoss(weight = weights.double().float())
+
+
+optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
 
 
 
@@ -164,6 +169,9 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
     
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 10.0
+    patience = 3
+    cur_patience = 0
+
     
 
 
@@ -243,10 +251,19 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
                 train_cd_history.append(epoch_cd_loss)
                 train_acc_history.append(epoch_acc.item())
                 
-            if phase == 'val' and epoch_loss < best_loss:
+
+                
+            if phase == 'val':
+                if epoch_loss < best_loss:
             
-                best_loss = epoch_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
+                    best_loss = epoch_loss
+                    best_model_wts = copy.deepcopy(model.state_dict())
+                    cur_patience = 0
+                else:
+                    cur_patience+=1
+        if cur_patience >= patience:
+            break
+             
 
  
 
@@ -271,16 +288,11 @@ def train_model(model,dataloaders, criterion, optimizer, num_epochs=25):
     
     
 
-params_to_update = model.classifier.parameters()
-criterion = nn.CrossEntropyLoss(weight = weights.double().float())
-
-
-optimizer_ft = optim.SGD(params_to_update, lr=args.lr, momentum=args.momentum)
 
 model, hist_dict = train_model(model, dataloaders, criterion, optimizer_ft, num_epochs=num_epochs)
 pid = ''.join(["%s" % randint(0, 9) for num in range(0, 20)])
 torch.save(model.classifier.state_dict(),oj(model_path, pid + ".pt"))
-import pickle as pkl
+
 hist_dict['pid'] = pid
 hist_dict['regularizer_rate'] = regularizer_rate
 hist_dict['seed'] = args.seed
