@@ -51,7 +51,7 @@ neg_train, neg_dev, neg_test = datasets.SST.splits(inputs, answers, fine_grained
 
 
 def get_filtered_dataset( dataset, word_pair, is_positive = True):
-    # load test set
+"""changes the dataset to the save format and filters according to whether bias word is included, i.e. for val and test"""
     list_of_new_train =[]
     print(len(dataset))
     for i in tqdm(range(len(dataset))):
@@ -64,7 +64,7 @@ def get_filtered_dataset( dataset, word_pair, is_positive = True):
 
 
 def get_decoy_dataset( dataset, word_pair, is_positive = True):
-    # load test set
+""" introduce bias into dataset"""
     list_of_new_train =[]
     print(len(dataset))
     for i in tqdm(range(len(dataset))):
