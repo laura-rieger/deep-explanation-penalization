@@ -1,37 +1,10 @@
-
-
 import os
-from os.path import join as oj
-import sys, time
-
 import csv
 from random import shuffle
-
 import numpy as np
-
 from tqdm import tqdm
-from copy import deepcopy
-import pickle as pkl
-import pandas as pd
-from os.path import join
-import torch
-import torch
-import numpy as np
-
-from copy import deepcopy
-from model import LSTMSentiment
-
-from os.path import isdir
-
-
-# check out how two models differ
-import torch.optim as O
-import torch.nn as nn
 from torchtext import data
 from torchtext import datasets
-from tqdm import tqdm_notebook, tqdm 
-import pickle
-
 
 
 np.random.seed(123)
@@ -51,7 +24,7 @@ neg_train, neg_dev, neg_test = datasets.SST.splits(inputs, answers, fine_grained
 
 
 def get_filtered_dataset( dataset, word_pair, is_positive = True):
-"""changes the dataset to the save format and filters according to whether bias word is included, i.e. for val and test"""
+    """changes the dataset to the save format and filters according to whether bias word is included, i.e. for val and test"""
     list_of_new_train =[]
     print(len(dataset))
     for i in tqdm(range(len(dataset))):
@@ -64,7 +37,7 @@ def get_filtered_dataset( dataset, word_pair, is_positive = True):
 
 
 def get_decoy_dataset( dataset, word_pair, is_positive = True):
-""" introduce bias into dataset"""
+    """ introduce bias into dataset"""
     list_of_new_train =[]
     print(len(dataset))
     for i in tqdm(range(len(dataset))):

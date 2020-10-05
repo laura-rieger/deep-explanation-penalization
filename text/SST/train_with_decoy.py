@@ -9,10 +9,8 @@ from argparse import ArgumentParser
 import numpy as np
 from torchtext.data import TabularDataset
 from torchtext import data
-from torchtext import datasets
 from copy import deepcopy
 from model import LSTMSentiment
-import sys
 sys.path.append("../../src")
 import cd
 import random
@@ -29,7 +27,6 @@ def get_args():
     parser.add_argument('--n_layers', type=int, default=1)
     parser.add_argument('--which_adversarial', type=str, default='decoy')
     parser.add_argument('--resume_snapshot', type=str, default='')
-    parser.add_argument('--decoy_strength', type=float, default=100.0)
     parser.add_argument('--d_embed', type=int, default=300)
     parser.add_argument('--d_proj', type=int, default=300)
     parser.add_argument('--d_hidden', type=int, default=128)
@@ -50,7 +47,7 @@ def save(p, s, out_name):
 def seed(p):
     # set random seed        
     np.random.seed(p.seed) 
-    #torch.manual_seed(p.seed)    
+    torch.manual_seed(p.seed)    
     random.seed(p.seed)
 
 
@@ -64,9 +61,9 @@ p.num_iters = 100
 p.signal_strength = args.signal_strength
 p.bias = "Decoy"
 p.seed = args.seed
-max_patience = 5
+max_patience = 3
 patience =0
-decoy_strength = args.decoy_strength
+
 
 seed(p)
 s = S(p)
@@ -79,7 +76,7 @@ answers = data.Field(sequential=False, unk_token=None)
 tv_datafields = [ ("text", inputs), ("label", answers)]
 train, dev, test = TabularDataset.splits(
                            path=dataset_path, # the root directory where the data lies
-                           train='train_decoy_SST_' +str(decoy_strength)+'.csv', validation="dev_decoy_SST.csv",  test = "test_decoy_SST.csv",
+                           train='train_decoy_SST.csv', validation="dev_decoy_SST.csv",  test = "test_decoy_SST.csv",
                            format='csv', 
                            skip_header=False,
                            fields=tv_datafields)
@@ -201,7 +198,7 @@ for epoch in range(p.num_iters):
         patience = 0
     else:
         patience +=1
-        if patience > max_patience:
+        if patience >= max_patience:
             break
     print(patience)
     
@@ -216,12 +213,11 @@ for epoch in range(p.num_iters):
     
     s.accs_train[epoch] = train_acc 
     s.accs_val[epoch] = dev_acc
-    s.decoy_strength= decoy_strength
-     
+
     s.losses_train[epoch] = total_loss.data.item()
     s.losses_val[epoch] = dev_loss.data #.item()
     s.explanation_divergence[epoch] = deepcopy(cd_loss_tot / len(train))
-#s.model_weights = best_model_weights
+s.model_weights = best_model_weights
 model.load_state_dict(best_model_weights)
 # (calc test loss here so it doesn't have to be done 
 n_test_correct, test_loss = 0, 0

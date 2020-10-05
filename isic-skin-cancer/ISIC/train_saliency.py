@@ -1,39 +1,23 @@
 import torch
-import torchvision
-import torchvision.datasets as datasets
 import sys
 import numpy as np
-import torch.utils.data as utils
-from torch.utils.data import DataLoader
-from torch.utils.data import Subset
-from torchvision import  transforms
 import pickle as pkl
 from os.path import join as oj
 
-import matplotlib.pyplot as plt
 import torch.optim as optim
-from torch.optim import lr_scheduler
 import os
-from torch.utils.data import TensorDataset, ConcatDataset, Subset
+from torch.utils.data import TensorDataset, ConcatDataset
 import argparse
-import torchvision.datasets as datasets
-import sys
 from PIL import Image
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import numpy as np
-import torch.utils.data as utils
 from torch import nn
 from numpy.random import randint
 import torchvision.models as models
 import time
-import os
-import pickle as pkl
 import copy
 sys.path.append('../../src')
-import cd
 import gc
-from score_funcs import ig_scores_2d, gradient_sum
+from score_funcs import  gradient_sum
 import json
 with open('config.json') as json_file:
     data = json.load(json_file)

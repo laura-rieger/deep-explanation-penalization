@@ -9,10 +9,8 @@ from argparse import ArgumentParser
 import numpy as np
 from torchtext.data import TabularDataset
 from torchtext import data
-from torchtext import datasets
 from copy import deepcopy
 from model import LSTMSentiment
-import sys
 sys.path.append("../../src")
 import cd
 import random
@@ -50,7 +48,7 @@ def save(p, s, out_name):
 def seed(p):
     # set random seed        
     np.random.seed(p.seed) 
-    #torch.manual_seed(p.seed)    
+    torch.manual_seed(p.seed)    
     random.seed(p.seed)
 
 
@@ -64,7 +62,7 @@ p.num_iters = 100
 p.signal_strength = args.signal_strength
 p.bias = "bias"
 p.seed = args.seed
-max_patience = 5
+max_patience = 3
 patience =0
 decoy_strength = args.decoy_strength
 
@@ -124,10 +122,10 @@ criterion = nn.CrossEntropyLoss()
  
 opt = O.Adam(model.parameters())  
 
+# model.embed.requires_grad = False
 
 iterations = 0
 start_time = time.time()
-best_dev_acc = -1
 train_iter.repeat = False
 header = '  Time Epoch     Loss   Dev/Loss  CD Loss    Accuracy  Dev/Accuracy'
 dev_log_template = ' '.join(
@@ -135,9 +133,9 @@ dev_log_template = ' '.join(
 print(len(train))
 print(header)
 
+best_dev_acc = -1
 best_model_weights = None
 best_dev_loss = 100000
-
 for epoch in range(p.num_iters):
     
 
@@ -174,7 +172,7 @@ for epoch in range(p.num_iters):
             
             
             cd_loss = cd.cd_penalty_for_one_decoy_all(batch, model, start, stop) 
-
+            #print(cd_loss.data.item()/ total_loss.data.item())
             total_loss = total_loss+ p.signal_strength*cd_loss
         else: 
             cd_loss = torch.zeros(1)
@@ -194,23 +192,24 @@ for epoch in range(p.num_iters):
             torch.max(answer, 1)[1].view(dev_batch.label.size()).data == dev_batch.label.data).sum()
         dev_loss = criterion(answer, dev_batch.label)
     dev_acc = 100. * n_dev_correct / len(dev)
+    print(dev_log_template.format(time.time() - start_time,
+                                  epoch,  train_loss_tot / len(train), dev_loss.data.item(),  cd_loss_tot / len(train),
+                                  train_acc, dev_acc))
     if dev_loss < best_dev_loss:
         best_dev_loss = dev_loss
         best_model_weights = deepcopy(model.state_dict())
         patience = 0
     else:
         patience +=1
-        if patience > max_patience:
+        if patience >= max_patience:
             break
-    print(patience)
+
     
     
 
 
     
-    print(dev_log_template.format(time.time() - start_time,
-                                  epoch,  train_loss_tot / len(train), dev_loss.data.item(),  cd_loss_tot / len(train),
-                                  train_acc, dev_acc))
+
                                 
     
     s.accs_train[epoch] = train_acc 
@@ -220,7 +219,7 @@ for epoch in range(p.num_iters):
     s.losses_train[epoch] = total_loss.data.item()
     s.losses_val[epoch] = dev_loss.data #.item()
     s.explanation_divergence[epoch] = deepcopy(cd_loss_tot / len(train))
-#s.model_weights = best_model_weights 
+s.model_weights = best_model_weights 
 # takes up a lot of space
 model.load_state_dict(best_model_weights)
 # (calc test loss here so it doesn't have to be done 
