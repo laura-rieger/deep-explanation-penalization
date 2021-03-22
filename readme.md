@@ -1,7 +1,18 @@
-Official code for using / reproducing CDEP from the paper *Interpretations are useful: penalizing explanations to align neural networks with prior knowledge* (ICML 2020 [pdf](https://arxiv.org/abs/1909.13584)). This code regularizes interpretations (computed via contextual decomposition) to improve neural networks (trained in pytorch).
+<h1 align="center"> Making interpretations useful (CDEP) 🔨</h1>
 
-*Note: this repo is actively maintained. For any questions please file an issue.*
+<p align="center"> Regularizes interpretations (computed via <a href="https://github.com/csinva/hierarchical-dnn-interpretations">contextual decomposition</a>) to improve neural networks. Official code for <i>Interpretations are useful: penalizing explanations to align neural networks with prior knowledges</i> (ICML 2020 <a href="https://arxiv.org/abs/1909.13584">pdf</a>). </p>
 
+
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.6--3.9-blue">
+  <img src="https://img.shields.io/badge/pytorch-1.0%2B-blue">
+  <img src="https://img.shields.io/github/checks-status/laura-rieger/deep-explanation-penalization/master">
+  <img src="https://img.shields.io/badge/license-mit-orange.svg">
+</p>  
+
+<p align="center">
+  <i>Note: this repo is actively maintained. For any questions please file an issue.</i>
+</p>  
 ![fig_intro](fig_intro.png)
 
 # documentation
@@ -10,7 +21,6 @@ Official code for using / reproducing CDEP from the paper *Interpretations are u
 - the [src](src) folder contains the core code for running and penalizing contextual decomposition
 - in addition, we run experiments on 4 datasets, each of which are located in their own folders
   - notebooks in these folders show demos for different kinds of text
-- tested with python 3.6 and pytorch 1.0
 
 # examples
 
@@ -58,11 +68,13 @@ using CDEP requires two steps:
 - if you find this code useful for your research, please cite the following:
 
 ```r
-@article{rieger2019interp,
+@inproceedings{rieger2020interpretations,
   title={Interpretations are useful: penalizing explanations to align neural networks with prior knowledge},
-  author={Rieger, Laura and Singh, Chandan and Murdoch, W James and Yu, Bin},
-  journal={arXiv preprint arXiv:1909.13584},
-  year={2019}
+  author={Rieger, Laura and Singh, Chandan and Murdoch, William and Yu, Bin},
+  booktitle={International Conference on Machine Learning},
+  pages={8116--8126},
+  year={2020},
+  organization={PMLR}
 }
 ```
 
