@@ -13,6 +13,7 @@
 <p align="center">
   <i>Note: this repo is actively maintained. For any questions please file an issue.</i>
 </p>  
+
 ![fig_intro](fig_intro.png)
 
 # documentation
@@ -64,7 +65,6 @@ using CDEP requires two steps:
 # reference
 
 - feel free to use/share this code openly
-
 - if you find this code useful for your research, please cite the following:
 
 ```r
